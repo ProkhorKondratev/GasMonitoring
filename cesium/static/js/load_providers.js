@@ -37,7 +37,7 @@ async function fetchTileProviders(layers = null) {
 
     if (!layers || layers.length === 0) {
         try {
-            const response = await fetch('/api/provider_views/');
+            const response = await fetch('/api/provider_models/');
             responseData = await response.json();
         } catch (error) {
             console.error(error);

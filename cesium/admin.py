@@ -25,7 +25,8 @@ class CesiumViewerAdmin(admin.ModelAdmin):
          {'fields': (
              'baseLayerPicker', 'fullscreenButton', 'geocoder', 'homeButton', 'sceneModePicker', 'navigationHelpButton',
              'navigationInstructionsInitiallyVisible', 'projectionPicker', ('timeline', 'animation'))}),
-        ('Поведение', {'fields': ('sceneMode', 'showRenderLoopErrors', 'selectionIndicator', 'infoBox')}),
+        ('Поведение', {'fields': (
+            'sceneMode', 'showRenderLoopErrors', 'selectionIndicator', 'infoBox', 'useBrowserRecommendedResolution')}),
         ('Параметры',
          {'fields': ('imageryProviderViewModels', 'terrainProviderViewModels', ('skyBox', 'skyAtmosphere', 'globe'),
                      'targetFrameRate', 'mapProjection', 'showCredit', 'fullscreenElement')}),

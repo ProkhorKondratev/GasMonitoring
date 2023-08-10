@@ -6,9 +6,11 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from rest_framework import routers
 
 from cesium.urls import view_sets as cesium_view_sets, urlpatterns as cesium_urls
+from geo_repository.urls import view_sets as geo_view_sets, urlpatterns as geo_urls
 
 router = routers.DefaultRouter()
 router.registry.extend(cesium_view_sets)
+router.registry.extend(geo_view_sets)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -16,6 +18,7 @@ urlpatterns = [
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 
     path('', include(cesium_urls)),
+    path('', include(geo_urls)),
 ]
 
 urlpatterns += staticfiles_urlpatterns()

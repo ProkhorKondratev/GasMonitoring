@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'django_filters',
 
     'cesium',
+    'geo_repository',
 ]
 
 REST_FRAMEWORK = {
@@ -124,6 +125,8 @@ STATICFILES_FINDERS = (
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
+    os.path.join(BASE_DIR, 'cesium', 'static'),
+    os.path.join(BASE_DIR, 'geo_repository', 'static'),
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
