@@ -1,5 +1,30 @@
 from django.db import models
 from sortedm2m.fields import SortedManyToManyField
+from colorfield.fields import ColorField
+
+# стандартные цвета для выбора
+COLOR_PALETTES = [
+    ('#FF0000', 'Красный'),
+    ('#00FF00', 'Зеленый'),
+    ('#0000FF', 'Синий'),
+    ('#FFFF00', 'Желтый'),
+]
+
+
+def default_cartesian2():
+    return {"x": 0.0, "y": 0.0}
+
+
+def default_cartesian3():
+    return {"x": 0.0, "y": 0.0, "z": 0.0}
+
+
+def default_near_far_scalar():
+    return {"near": 0.0, "nearValue": 0.0, "far": 0.0, "farValue": 0.0}
+
+
+def default_near_far():
+    return {"near": 0.0, "far": 0.0}
 
 
 class TileProvider(models.Model):
@@ -294,3 +319,494 @@ class CesiumViewer(models.Model):
         if self.is_default:
             CesiumViewer.objects.filter(is_default=True).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class CesiumAbstractGeometries(models.Model):
+    name = models.CharField(
+        max_length=255,
+        verbose_name='Название',
+        help_text='Название объекта',
+        null=True,
+        blank=True,
+    )
+    show = models.BooleanField(
+        default=True,
+        verbose_name='Отображение',
+        help_text='Включает отображение объекта',
+    )
+    heightReference = models.IntegerField(
+        default=0,
+        verbose_name='Выравнивание по высоте',
+        help_text='Выравнивание значка по высоте',
+        choices=(
+            (0, 'Без изменений'),
+            (1, 'Прижать к поверхности Земли'),
+            (2, 'Использовать высоту относительно точки на поверхности Земли'),
+        )
+    )
+    scaleByDistance = models.JSONField(
+        default=default_near_far_scalar,
+        verbose_name='Масштабирование по расстоянию',
+        help_text='Определяет масштабирование объекта в зависимости от расстояния до камеры',
+    )
+    translucencyByDistance = models.JSONField(
+        default=default_near_far_scalar,
+        verbose_name='Прозрачность по расстоянию',
+        help_text='Определяет прозрачность объекта в зависимости от расстояния до камеры',
+    )
+    distanceDisplayCondition = models.JSONField(
+        default=default_near_far,
+        verbose_name='Отображение по расстоянию',
+        help_text='Устанавливает диапазон, в котором объект будет отображаться',
+    )
+
+    class Meta:
+        abstract = True
+
+
+class CesiumAbstractObjects(CesiumAbstractGeometries):
+    scale = models.FloatField(
+        default=1.0,
+        verbose_name='Масштабирование',
+        help_text='Масштабирование значка',
+        null=True,
+        blank=True,
+    )
+    pixelOffset = models.JSONField(
+        default=default_cartesian2,
+        verbose_name='Смещение',
+        help_text='Смещение объекта относительно координат в пикселях',
+    )
+    eyeOffset = models.JSONField(
+        default=default_cartesian3,
+        verbose_name='Смещение относительно камеры',
+        help_text='Смещение объекта относительно камеры',
+    )
+    horizontalOrigin = models.IntegerField(
+        default=0,
+        verbose_name='Горизонтальное выравнивание',
+        help_text='Горизонтальное выравнивание объекта',
+        choices=(
+            (0, 'По центру'),
+            (1, 'Слева'),
+            (2, 'Справа'),
+        )
+    )
+    verticalOrigin = models.IntegerField(
+        default=0,
+        verbose_name='Вертикальное выравнивание',
+        help_text='Вертикальное выравнивание объекта',
+        choices=(
+            (0, 'По центру'),
+            (1, 'Снизу'),
+            (3, 'Сверху'),
+        )
+    )
+    pixelOffsetScaleByDistance = models.JSONField(
+        default=default_near_far_scalar,
+        verbose_name='Смещение по расстоянию',
+        help_text='Определяет смещение объекта в зависимости от расстояния до камеры',
+    )
+
+    class Meta:
+        abstract = True
+
+
+class CesiumBillboard(CesiumAbstractObjects):
+    image = models.FileField(
+        verbose_name='Иконка типа',
+        upload_to='bilboard_images',
+        help_text='Иконка для визуализации типа объекта',
+        default=None,
+        null=True,
+        blank=True,
+    )
+    color = ColorField(
+        format='hexa',
+        default='#FF000000',
+        verbose_name='Цвет',
+        help_text='Цвет значка',
+        samples=COLOR_PALETTES
+    )
+    rotation = models.FloatField(
+        default=0.0,
+        verbose_name='Поворот',
+        help_text='Поворот значка',
+    )
+    alignedAxis = models.JSONField(
+        default=default_cartesian3,
+        verbose_name='Ось выравнивания',
+        help_text='Ось выравнивания значка',
+    )
+    width = models.IntegerField(
+        default=64,
+        verbose_name='Ширина',
+        help_text='Ширина значка (в пикселях)',
+    )
+    height = models.IntegerField(
+        default=64,
+        verbose_name='Высота',
+        help_text='Высота значка (в пикселях)',
+    )
+
+    class Meta:
+        verbose_name = 'Стиль значка'
+        verbose_name_plural = 'Стили значков'
+
+    def __str__(self):
+        return self.name if self.name else 'Стиль значка'
+
+
+class CesiumLabel(CesiumAbstractObjects):
+    text = models.CharField(
+        default=None,
+        max_length=255,
+        verbose_name='Текст',
+        help_text='Текст метки',
+        null=True,
+        blank=True,
+    )
+    font = models.CharField(
+        default='30px sans-serif',
+        max_length=255,
+        verbose_name='Шрифт',
+        help_text='Шрифт метки. Пример: 30px sans-serif',
+    )
+    style = models.IntegerField(
+        default=2,
+        verbose_name='Стиль',
+        help_text='Стиль метки',
+        choices=(
+            (0, 'Заливка без обводки'),
+            (1, 'Обводка без заливки'),
+            (2, 'Заливка и обводка'),
+        )
+    )
+    showBackground = models.BooleanField(
+        default=False,
+        verbose_name='Отображение фона',
+        help_text='Включает отображение фона метки',
+    )
+    backgroundColor = ColorField(
+        format='hexa',
+        default='#FF000000',
+        verbose_name='Цвет фона',
+        help_text='Цвет фона метки',
+        samples=COLOR_PALETTES,
+        null=True,
+        blank=True,
+    )
+    backgroundPadding = models.JSONField(
+        default=default_cartesian2,
+        verbose_name='Отступ фона',
+        help_text='Отступ фона метки от текста',
+    )
+    fillColor = ColorField(
+        format='hexa',
+        default='#FF000000',
+        verbose_name='Цвет заливки',
+        help_text='Цвет заливки метки',
+        samples=COLOR_PALETTES,
+        null=True,
+        blank=True,
+    )
+    outlineColor = ColorField(
+        format='hexa',
+        default='#FF000000',
+        verbose_name='Цвет обводки',
+        help_text='Цвет обводки метки',
+        samples=COLOR_PALETTES,
+        null=True,
+        blank=True,
+    )
+    outlineWidth = models.FloatField(
+        default=1.0,
+        verbose_name='Ширина обводки',
+        help_text='Ширина обводки метки (в пикселях)',
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Стиль надписи'
+        verbose_name_plural = 'Стили надписей'
+
+    def __str__(self):
+        return self.name if self.name else 'Стиль надписи'
+
+
+class CesiumPoint(CesiumAbstractGeometries):
+    pixelSize = models.FloatField(
+        default=1.0,
+        verbose_name='Размер',
+        help_text='Размер точки (в пикселях)',
+    )
+    color = ColorField(
+        format='hexa',
+        default='#FF000000',
+        verbose_name='Цвет',
+        help_text='Цвет точки',
+        samples=COLOR_PALETTES
+    )
+    outlineColor = ColorField(
+        format='hexa',
+        default='#FF000000',
+        verbose_name='Цвет обводки',
+        help_text='Цвет обводки точки',
+        samples=COLOR_PALETTES
+    )
+    outlineWidth = models.FloatField(
+        default=1.0,
+        verbose_name='Ширина обводки',
+        help_text='Ширина обводки точки',
+    )
+
+    class Meta:
+        verbose_name = 'Стиль точки'
+        verbose_name_plural = 'Стили точек'
+
+    def __str__(self):
+        return self.name if self.name else 'Стиль точки'
+
+
+class CesiumPolylineMaterial(models.Model):
+    name = models.CharField(
+        max_length=50,
+        default='Color',
+        verbose_name='Название материала',
+        help_text='Название материала',
+    )
+    type = models.CharField(
+        max_length=20,
+        default='Color',
+        verbose_name='Тип материала',
+        help_text='Тип материала',
+        choices=(
+            ('Color', 'Цвет'),
+            # ('PolylineArrow', 'Стрелка'),
+            ('PolylineDash', 'Пунктир'),
+            # ('PolylineGlow', 'Свечение'),
+            # ('PolylineOutline', 'Контур'),
+        ))
+    color = ColorField(
+        format="hexa",
+        default='#FF000000',
+        verbose_name='Цвет заливки',
+        help_text='Позволяет установить цвет заливки линии',
+        samples=COLOR_PALETTES,
+    )
+    gapColor = ColorField(
+        format="hexa",
+        default='#FF000000',
+        verbose_name='Цвет промежутков линии',
+        help_text='Позволяет установить цвет промежутков линии',
+        samples=COLOR_PALETTES,
+    )
+    dashLength = models.IntegerField(
+        default=16,
+        verbose_name='Длина пунктира в пикселях',
+        help_text='Позволяет установить длину пунктира в пикселях',
+    )
+
+    class Meta:
+        verbose_name = 'Стиль текстуры линии'
+        verbose_name_plural = 'Стили текстур линий'
+
+    def __str__(self):
+        return self.name
+
+
+class CesiumPolyline(CesiumAbstractGeometries):
+    width = models.FloatField(
+        default=1.0,
+        verbose_name='Ширина',
+        help_text='Ширина линии (в пикселях)',
+    )
+    material = models.ForeignKey(
+        CesiumPolylineMaterial,
+        on_delete=models.CASCADE,
+        related_name='PolylineMaterial',
+        related_query_name='PolylineMaterial',
+        verbose_name='Материал',
+        help_text='Стандартный материал линии',
+        null=True,
+        blank=True,
+    )
+    depthFailMaterial = models.ForeignKey(
+        CesiumPolylineMaterial,
+        on_delete=models.CASCADE,
+        related_name='PolylineDepthFailMaterial',
+        related_query_name='PolylineDepthFailMaterial',
+        verbose_name='Материал под рельефом',
+        help_text='Материал, использующийся для линии, когда она проходит под рельефом',
+        null=True,
+        blank=True,
+    )
+    clampToGround = models.BooleanField(
+        default=False,
+        verbose_name='Прижать к поверхности Земли',
+        help_text='Прижать линию к поверхности Земли',
+    )
+    shadows = models.IntegerField(
+        default=0,
+        verbose_name='Тень',
+        help_text='Тень линии',
+        choices=(
+            (0, 'Нет тени'),
+            (1, 'Принимать и отбрасывать тень'),
+            (2, 'Отбрасывать тень'),
+            (3, 'Принимать тень'),
+        )
+    )
+    zIndex = models.IntegerField(
+        default=0,
+        verbose_name='Z-индекс',
+        help_text='Определяет индекс, используемый для упорядочивания линий при отображении. '
+                  'Изображается только тогда, когда параметр ClampToGround установлен в true',
+    )
+
+    class Meta:
+        verbose_name = 'Стиль линии'
+        verbose_name_plural = 'Стили линий'
+
+    def __str__(self):
+        return self.name if self.name else 'Стиль линии'
+
+
+class CesiumPolygonMaterial(models.Model):
+    name = models.CharField(
+        max_length=50,
+        default='Color',
+        verbose_name='Название материала',
+        help_text='Название материала',
+    )
+    type = models.CharField(
+        max_length=20,
+        default='Color',
+        verbose_name='Тип материала',
+        help_text='Тип материала',
+        choices=(
+            ('Color', 'Цвет'),
+            # ('Image', 'Изображение'),
+            # ('Grid', 'Сетка'),
+            # ('Stripe', 'Полосы'),
+            # ('Checkerboard', 'Шахматы'),
+            # ('Dot', 'Точки'),
+            # ('Water', 'Вода'),
+        ))
+    color = ColorField(
+        format="hexa",
+        default='#FF0000',
+        verbose_name='Цвет заливки',
+        help_text='Позволяет установить цвет заливки полигона',
+        samples=COLOR_PALETTES,
+    )
+
+    class Meta:
+        verbose_name = 'Стиль текстуры полигона'
+        verbose_name_plural = 'Стили текстур полигонов'
+
+    def __str__(self):
+        return self.name
+
+
+class CesiumPolygon(CesiumAbstractGeometries):
+    height = models.FloatField(
+        default=0.0,
+        verbose_name='Высота',
+        help_text='Высота полигона (в метрах) относительно поверхности Земли',
+        null=True,
+        blank=True,
+    )
+    extrudedHeight = models.FloatField(
+        default=0.0,
+        verbose_name='Высота полигона',
+        help_text='Высота полигона в 3-х мерном пространстве (в метрах)',
+        null=True,
+        blank=True,
+    )
+    extrudedHeightReference = models.IntegerField(
+        default=0,
+        verbose_name='Поверхность высоты полигона',
+        help_text='Определяет поверхность, относительно которой считается высота полигона в 3-х мерном пространстве',
+        choices=(
+            (0, 'Без изменений'),
+            (1, 'Прижать к поверхности Земли'),
+            (2, 'Использовать высоту относительно точки на поверхности Земли'),
+        )
+    )
+    stRotation = models.FloatField(
+        default=0.0,
+        verbose_name='Поворот',
+        help_text='Определяет поворот текстуры полигона против часовой стрелки с севера',
+        null=True,
+        blank=True,
+    )
+    fill = models.BooleanField(
+        default=True,
+        verbose_name='Заливка',
+        help_text='Определяет, будет ли отображаться заливка полигона',
+    )
+    material = models.ForeignKey(
+        CesiumPolygonMaterial,
+        on_delete=models.CASCADE,
+        related_name='PolygonMaterial',
+        related_query_name='PolygonMaterial',
+        verbose_name='Материал',
+        help_text='Определяет материал, используемый для отображения заливки полигона',
+        null=True,
+        blank=True,
+    )
+    outline = models.BooleanField(
+        default=False,
+        verbose_name='Контур',
+        help_text='Определяет, будет ли отображаться контур полигона',
+    )
+    outlineColor = ColorField(
+        format="hexa",
+        default='#FF000000',
+        verbose_name='Цвет контура',
+        help_text='Позволяет установить цвет контура полигона',
+        samples=COLOR_PALETTES,
+    )
+    outlineWidth = models.FloatField(
+        default=1.0,
+        verbose_name='Ширина контура',
+        help_text='Ширина контура полигона (в пикселях) - временно не работает по ошибке в CesiumJS',
+    )
+    closeTop = models.BooleanField(
+        default=True,
+        verbose_name='Закрыть верх',
+        help_text='Если false, то оставляет открытой верхнюю часть полигона',
+    )
+    closeBottom = models.BooleanField(
+        default=True,
+        verbose_name='Закрыть низ',
+        help_text='Если false, то оставляет открытой нижнюю часть полигона',
+    )
+    shadows = models.IntegerField(
+        default=0,
+        verbose_name='Тень',
+        help_text='Тень полигона',
+        choices=(
+            (0, 'Нет тени'),
+            (1, 'Принимать и отбрасывать тень'),
+            (2, 'Отбрасывать тень'),
+            (3, 'Принимать тень'),
+        )
+    )
+    zIndex = models.IntegerField(
+        default=0,
+        verbose_name='Z-индекс',
+        help_text='Определяет индекс, используемый для упорядочивания полигонов при отображении. '
+                  'Применяется только тогда, когда параметры Height и ExtrudedHeight установлены не установлены',
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Стиль полигона'
+        verbose_name_plural = 'Стили полигонов'
+
+    def __str__(self):
+        return self.name if self.name else 'Стиль полигона'

@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'sortedm2m',
     'django_json_widget',
     'django_filters',
+    'colorfield',
 
     'cesium',
     'geo_repository',
