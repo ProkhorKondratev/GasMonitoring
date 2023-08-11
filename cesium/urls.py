@@ -17,5 +17,5 @@ view_sets = [
 ]
 
 urlpatterns = [
-    path("map", MapView.as_view(), name="map"),
+    path("", MapView.as_view(), name="map"),
 ]

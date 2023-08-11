@@ -1,6 +1,16 @@
 async function setupCesium() {
     const viewer = await fetchViewer('cesiumContainer');
 
+    function handleTileLoadProgress(progress) {
+        if (progress === 1) {
+            console.log('Карта загружена');
+            viewer.scene.globe.tileLoadProgressEvent.removeEventListener(handleTileLoadProgress);
+        }
+    }
+
+    viewer.scene.globe.tileLoadProgressEvent.addEventListener(handleTileLoadProgress);
+
+
     const zoneStyle = await fetchStyle('Polygon')
     const zones = await ApiService.getZMR();
 
@@ -15,7 +25,7 @@ async function setupCesium() {
 
         viewer.entities.add(zoneEntity)
     }
-    viewer.zoomTo(viewer.entities)
+    viewer.flyTo(viewer.entities)
 }
 
 setupCesium();
