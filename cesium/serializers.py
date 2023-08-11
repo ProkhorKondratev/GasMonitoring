@@ -70,6 +70,7 @@ class CesiumPolylineSerializer(ModelSerializer):
     class Meta:
         model = cesium_models.CesiumPolyline
         exclude = ('heightReference', 'scaleByDistance', 'translucencyByDistance')
+        depth = 1
 
 
 class CesiumPolylineViewSet(ModelViewSet):
@@ -82,6 +83,7 @@ class CesiumPolygonSerializer(ModelSerializer):
     class Meta:
         model = cesium_models.CesiumPolygon
         exclude = ('scaleByDistance', 'translucencyByDistance')
+        depth = 1
 
 
 class CesiumPolygonViewSet(ModelViewSet):

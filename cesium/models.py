@@ -20,11 +20,11 @@ def default_cartesian3():
 
 
 def default_near_far_scalar():
-    return {"near": 0.0, "nearValue": 0.0, "far": 0.0, "farValue": 0.0}
+    return {"near": 0.0, "nearValue": 0.0, "far": 1.0, "farValue": 0.0}
 
 
 def default_near_far():
-    return {"near": 0.0, "far": 0.0}
+    return {"near": 0.0, "far": 10000000.0}
 
 
 class TileProvider(models.Model):
@@ -329,6 +329,11 @@ class CesiumAbstractGeometries(models.Model):
         null=True,
         blank=True,
     )
+    is_default = models.BooleanField(
+        default=False,
+        verbose_name='По умолчанию',
+        help_text='Устанавливает объект по умолчанию',
+    )
     show = models.BooleanField(
         default=True,
         verbose_name='Отображение',
@@ -362,6 +367,11 @@ class CesiumAbstractGeometries(models.Model):
 
     class Meta:
         abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            self.__class__.objects.filter(is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)
 
 
 class CesiumAbstractObjects(CesiumAbstractGeometries):
@@ -576,6 +586,11 @@ class CesiumPolylineMaterial(models.Model):
         verbose_name='Название материала',
         help_text='Название материала',
     )
+    is_default = models.BooleanField(
+        default=False,
+        verbose_name='По умолчанию',
+        help_text='Использовать по умолчанию',
+    )
     type = models.CharField(
         max_length=20,
         default='Color',
@@ -614,6 +629,11 @@ class CesiumPolylineMaterial(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            self.__class__.objects.filter(is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)
 
 
 class CesiumPolyline(CesiumAbstractGeometries):
@@ -680,6 +700,11 @@ class CesiumPolygonMaterial(models.Model):
         verbose_name='Название материала',
         help_text='Название материала',
     )
+    is_default = models.BooleanField(
+        default=False,
+        verbose_name='По умолчанию',
+        help_text='Использовать по умолчанию',
+    )
     type = models.CharField(
         max_length=20,
         default='Color',
@@ -708,6 +733,11 @@ class CesiumPolygonMaterial(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            self.__class__.objects.filter(is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)
 
 
 class CesiumPolygon(CesiumAbstractGeometries):
