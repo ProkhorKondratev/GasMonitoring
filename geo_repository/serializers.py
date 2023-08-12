@@ -26,6 +26,7 @@ class ZMRGeometrySerializer(GeoFeatureModelSerializer):
     date_end = serializers.DateTimeField(format='%d.%m.%Y - %H:%M', read_only=True)
     is_relevant = serializers.BooleanField(read_only=True)
     zone = serializers.PrimaryKeyRelatedField(read_only=True)
+    name = serializers.CharField(source='zone.name', read_only=True)
 
     class Meta:
         model = ZMRGeometry
