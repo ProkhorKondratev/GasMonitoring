@@ -166,6 +166,7 @@ class StyleFactory {
     }
 
     static createLabelStyle(base_style) {
+        return new LabelStyle(base_style)
     }
 }
 

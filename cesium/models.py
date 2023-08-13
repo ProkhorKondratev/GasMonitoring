@@ -1,6 +1,9 @@
+import os
 from django.db import models
+from django.core.exceptions import ValidationError
 from sortedm2m.fields import SortedManyToManyField
 from colorfield.fields import ColorField
+
 
 # стандартные цвета для выбора
 COLOR_PALETTES = [
@@ -9,6 +12,14 @@ COLOR_PALETTES = [
     ('#0000FF', 'Синий'),
     ('#FFFF00', 'Желтый'),
 ]
+
+
+# валидатор имен файлов изображений для значков
+def image_file_extension_validator(value):
+    ext = os.path.splitext(value.name)[1]
+    valid_extensions = ['.svg', '.png', '.jpg', '.jpeg', '.gif']
+    if not ext.lower() in valid_extensions:
+        raise ValidationError(f'Неверный формат файла. Допустимые форматы: {valid_extensions}')
 
 
 def default_cartesian2():
@@ -430,6 +441,7 @@ class CesiumBillboard(CesiumAbstractObjects):
         default=None,
         null=True,
         blank=True,
+        validators=[image_file_extension_validator]
     )
     color = ColorField(
         format='hexa',

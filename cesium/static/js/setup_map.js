@@ -28,7 +28,6 @@ class CesiumMap {
     handleTileLoadProgress(progress) {
         const loadingOverlay = document.getElementById('loading-overlay');
         if (progress === 0) {
-            // анимируем плавное исчезновение и в конце скрываем
             loadingOverlay.animate([{opacity: 1}, {opacity: 0}], {duration: 500}).onfinish = () => {
                 loadingOverlay.style.display = 'none';
             }

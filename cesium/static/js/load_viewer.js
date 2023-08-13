@@ -1,8 +1,36 @@
+class OpenStreetMapNominatimGeocoder {
+    geocode(input) {
+        const endpoint = "https://nominatim.openstreetmap.org/search";
+        const resource = new Cesium.Resource({
+            url: endpoint,
+            queryParameters: {
+                format: "json",
+                q: input,
+            },
+        });
+
+        return resource.fetchJson().then(results => {
+            return results.map(resultObject => {
+                const bboxDegrees = resultObject.boundingbox;
+                return {
+                    displayName: resultObject.display_name,
+                    destination: Cesium.Rectangle.fromDegrees(
+                        bboxDegrees[2],
+                        bboxDegrees[0],
+                        bboxDegrees[3],
+                        bboxDegrees[1]
+                    ),
+                };
+            });
+        });
+    }
+}
+
 function createViewer(api_viewer, containerId, imageryProviderViewModels, terrainProviderViewModels) {
     const base_viewer = new Cesium.Viewer(containerId, {
         baseLayerPicker: api_viewer.baseLayerPicker,
         fullscreenButton: api_viewer.fullscreenButton,
-        geocoder: api_viewer.geocoder,
+        geocoder: api_viewer.geocoder === true ? new OpenStreetMapNominatimGeocoder() : false,
         homeButton: api_viewer.homeButton,
         infoBox: api_viewer.infoBox,
         sceneModePicker: api_viewer.sceneModePicker,
