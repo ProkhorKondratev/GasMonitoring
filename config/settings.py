@@ -76,21 +76,37 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = "config.asgi.application"
 
-# Database
-DATABASES = {
-    'default': {
-        "ENGINE": 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'GasMonitoring',
-        'USER': 'prokhor',
-        'PASSWORD': '12345',
-        'HOST': '127.0.0.1',
-        'PORT': '5432',
+if os.name == 'nt':
+    # Database
+    DATABASES = {
+        'default': {
+            "ENGINE": 'django.contrib.gis.db.backends.postgis',
+            'NAME': 'GasMonitoring',
+            'USER': 'user',
+            'PASSWORD': '12345',
+            'HOST': '127.0.0.2',
+            'PORT': '5433',
+        }
     }
-}
 
-GDAL_LIBRARY_PATH = r'/opt/homebrew/lib/libgdal.dylib'
-GEOS_LIBRARY_PATH = r'/opt/homebrew/lib/libgeos_c.dylib'
-PROJ_LIB = r'/opt/homebrew/Cellar/proj/9.2.1/share/proj/proj.db'
+    GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
+    GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
+    PROJ_LIB = os.getenv('PROJ_LIB')
+else:
+    DATABASES = {
+        'default': {
+            "ENGINE": 'django.contrib.gis.db.backends.postgis',
+            'NAME': 'GasMonitoring',
+            'USER': 'prokhor',
+            'PASSWORD': '12345',
+            'HOST': '127.0.0.1',
+            'PORT': '5432',
+        }
+    }
+
+    GDAL_LIBRARY_PATH = r'/opt/homebrew/lib/libgdal.dylib'
+    GEOS_LIBRARY_PATH = r'/opt/homebrew/lib/libgeos_c.dylib'
+    PROJ_LIB = r'/opt/homebrew/Cellar/proj/9.2.1/share/proj/proj.db'
 
 
 AUTH_PASSWORD_VALIDATORS = [

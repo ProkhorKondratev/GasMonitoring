@@ -137,8 +137,8 @@ class ObjectManager {
     }
 
     highlightObject(object) {
-        object.polygon.material = Cesium.Color.RED.withAlpha(0.5);
-        object.polyline.material = Cesium.Color.RED.withAlpha(0.5);
+        object.polygon.material = Cesium.Color.BLACK.withAlpha(0.5);
+        object.polyline.material = Cesium.Color.BLACK
     }
 
     //TODO Оптимизировать, расширить функционал
