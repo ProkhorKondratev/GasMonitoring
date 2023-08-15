@@ -43,14 +43,18 @@ class PolylineStyle {
             this.material = Cesium.Color.fromCssColorString(base_style.material.color);
         }
 
-        if (base_style.depthFailMaterial.type === 'PolylineDash') {
-            this.depthFailMaterial = new Cesium.PolylineDashMaterialProperty({
-                color: Cesium.Color.fromCssColorString(base_style.depthFailMaterial.color),
-                gapColor: Cesium.Color.fromCssColorString(base_style.depthFailMaterial.gapColor),
-                dashLength: base_style.depthFailMaterial.dashLength
-            });
+        if (base_style.depthFailMaterial) {
+            if (base_style.depthFailMaterial.type === 'PolylineDash') {
+                this.depthFailMaterial = new Cesium.PolylineDashMaterialProperty({
+                    color: Cesium.Color.fromCssColorString(base_style.depthFailMaterial.color),
+                    gapColor: Cesium.Color.fromCssColorString(base_style.depthFailMaterial.gapColor),
+                    dashLength: base_style.depthFailMaterial.dashLength
+                });
+            } else {
+                this.depthFailMaterial = Cesium.Color.fromCssColorString(base_style.depthFailMaterial.color);
+            }
         } else {
-            this.depthFailMaterial = Cesium.Color.fromCssColorString(base_style.depthFailMaterial.color);
+            this.depthFailMaterial = this.material
         }
     }
 }
