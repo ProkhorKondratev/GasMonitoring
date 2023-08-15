@@ -2,7 +2,26 @@ import json
 from datetime import datetime
 
 import psycopg2
-from geo_repository.models import ZMR, ZMRGeometry
+from geo_repository.models import ZMR, ZMRGeometry, OZ, OZGeometry
+
+
+class OZ_Object:
+    def __init__(self, id, name, geom, lpu=None, db=None, unique_id=None):
+        self.id = id
+        self.name = name
+        self.geom = geom
+        self.lpu = lpu
+        self.db = db
+        self.unique_id = unique_id
+
+    def make_unique_id(self):
+        return f'{self.id}_{self.lpu}_{self.db}_{self.name}'
+
+    def __str__(self):
+        return f'{self.name}[{self.id}]'
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class Zone:
@@ -89,6 +108,13 @@ class LegacyDB:
         if object_table:
             return object_table[0][0]
 
+    def get_latest_oz_table(self, schema, date=None):
+        condition = f"AND table_name LIKE 'OZ_all_{date}'" if date else "AND table_name LIKE 'OZ_all_%'"
+        oz_table = self.execute(
+            f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema}' {condition} ORDER BY table_name DESC")
+        if oz_table:
+            return oz_table[0][0]
+
     def get_zones(self):
         zones = []
         for schema in self.lpu_names:
@@ -110,6 +136,16 @@ class LegacyDB:
                                            geom=o[4], lpu=schema, db=self.dbname) for o in viol_objects])
         return objects
 
+    def get_oz(self):
+        oz = []
+        for schema in self.lpu_names:
+            oz_table = self.get_latest_oz_table(schema)
+            if oz_table:
+                oz_objects = self.execute(
+                    f'SELECT id, name, geom FROM {schema}."{oz_table}" WHERE geom IS NOT NULL')
+                oz.extend([OZ_Object(id=o[0], name=o[1], geom=o[2], lpu=schema, db=self.dbname) for o in oz_objects])
+        return oz
+
     def close(self):
         self.cursor.close()
         self.conn.close()
@@ -118,73 +154,7 @@ class LegacyDB:
 class ZonesManager:
     def __init__(self, objects):
         self.legacy_zmr = objects
-        self.zones_relations_file = 'zones_relations.json'
-        self.zones_relations = []
-        self.load_zones_relations()
-
-    def load_zones_relations(self):
         self.save_all_to_django()
-
-        # if pathlib.Path(self.zones_relations_file).exists():
-        #     with open(self.zones_relations_file, 'r') as f:
-        #         self.zones_relations = json.load(f)
-        #         self.check_zones_relations()
-        # else:
-        #     self.save_all_to_django()
-
-    def check_zones_relations(self):
-        for legacy_zmr in self.legacy_zmr:
-            found_in_django = False
-
-            for relation in self.zones_relations:
-                if legacy_zmr.make_unique_id() == relation['unique_id']:
-                    found_in_django = True
-
-                    if legacy_zmr.geom != relation['geom']:
-                        self.update_zone(legacy_zmr)
-                        relation['geom'] = legacy_zmr.geom
-                    break
-
-            if not found_in_django:
-                self.create_zone(legacy_zmr)
-
-        for relation in self.zones_relations[:]:
-            found_in_legacy = any(
-                legacy_zmr.make_unique_id() == relation['unique_id'] for legacy_zmr in self.legacy_zmr)
-            if not found_in_legacy:
-                self.delete_zone_by_relation(relation)
-
-        self.save_to_file(self.zones_relations)
-
-    @staticmethod
-    def update_zone(legacy_zmr):
-        zone = ZMR.objects.get(unique_id=legacy_zmr.make_unique_id())
-        zone_geometry = ZMRGeometry.objects.get(zone=zone)
-
-        zone_geometry.is_relevant = False
-        zone_geometry.date_end = datetime.now()
-        zone_geometry.save()
-
-        ZMRGeometry.objects.create(zone=zone, geom=legacy_zmr.geom)
-
-    def create_zone(self, legacy_zmr):
-        new_zone = ZMR(name=legacy_zmr.name, unique_id=legacy_zmr.make_unique_id())
-        new_zone.save()
-
-        zone_geometry = ZMRGeometry(zone=new_zone, geom=legacy_zmr.geom)
-        zone_geometry.save()
-
-        self.zones_relations.append(self.make_relation(unique_id=legacy_zmr.make_unique_id(), geom=legacy_zmr.geom))
-
-    def delete_zone_by_relation(self, relation):
-        django_zone = ZMR.objects.get(unique_id=relation['unique_id'])
-        django_zone.delete()
-
-        zone_geometry = ZMRGeometry.objects.filter(zone=django_zone)
-        for z in zone_geometry:
-            z.delete()
-
-        self.zones_relations.remove(relation)
 
     def save_all_to_django(self):
         ZMR.objects.all().delete()
@@ -192,31 +162,16 @@ class ZonesManager:
 
         zones = []
         zones_geometries = []
-        relations = []
 
         for zmr in self.legacy_zmr:
-            zone = ZMR(name=zmr.name)  # unique_id=zmr.make_unique_id())
+            zone = ZMR(name=zmr.name)
             zones.append(zone)
 
             zone_geometry = ZMRGeometry(zone=zone, geom=zmr.geom)
             zones_geometries.append(zone_geometry)
 
-            # relations.append(self.make_relation(unique_id=zmr.make_unique_id(), geom=zmr.geom))
-
         ZMR.objects.bulk_create(zones)
         ZMRGeometry.objects.bulk_create(zones_geometries)
-        # self.save_to_file(relations)
-
-    @staticmethod
-    def make_relation(unique_id, geom):
-        return {
-            'unique_id': unique_id,
-            'geom': geom,
-        }
-
-    def save_to_file(self, data):
-        with open(self.zones_relations_file, 'w') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 class ObjectsManager:
@@ -257,6 +212,29 @@ class ObjectsManager:
         ObjectGeometry.objects.bulk_create(objects_geometries)
 
 
+class OZManager:
+    def __init__(self, objects):
+        self.legacy_oz = objects
+        self.save_all_to_django()
+
+    def save_all_to_django(self):
+        OZ.objects.all().delete()
+        OZGeometry.objects.all().delete()
+
+        oz = []
+        oz_geometries = []
+
+        for oz_obj in self.legacy_oz:
+            zone = OZ(name=oz_obj.name)
+            oz.append(zone)
+
+            zone_geometry = OZGeometry(zone=zone, geom=oz_obj.geom)
+            oz_geometries.append(zone_geometry)
+
+        OZ.objects.bulk_create(oz)
+        OZGeometry.objects.bulk_create(oz_geometries)
+
+
 db_list = ['transgaz_samara', 'gazprom_dobycha_krasnodar', 'gazprom_pererabotka', 'transgaz_chaykovskiy',
            'transgaz_chechen', 'transgaz_ekaterenburg', 'transgaz_kazan', 'transgaz_krasnodar', 'transgaz_mahachkala',
            'transgaz_moskva', 'transgaz_nizhniy_novgorod', 'transgaz_saratov', 'transgaz_spb', 'transgaz_stavropol',
@@ -293,6 +271,23 @@ def load_objects():
 
     print(f'Получено {len(objects)} объектов нарушений. Запуск проверки и загрузки в БД Django')
     ObjectsManager(objects)
+
+    end_time = datetime.now()
+    print(f'Загрузка завершена за {end_time - start_time}')
+
+
+def load_oz():
+    start_time = datetime.now()
+
+    ozs = []
+
+    for db in db_list[:1]:
+        legacy_db = LegacyDB(db_name=db)
+        ozs.extend(legacy_db.get_oz())
+        legacy_db.close()
+
+    print(f'Получено {len(ozs)} охранных зон. Запуск проверки и загрузки в БД Django')
+    OZManager(ozs)
 
     end_time = datetime.now()
     print(f'Загрузка завершена за {end_time - start_time}')

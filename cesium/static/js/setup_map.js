@@ -20,6 +20,7 @@ class CesiumMap {
 
     async setupCesium() {
         this.viewer = await fetchViewer(this.containerId);
+        this.viewer.extend(Cesium.viewerDragDropMixin);
 
         this.handleTileLoadProgress = this.handleTileLoadProgress.bind(this);
         this.viewer.scene.globe.tileLoadProgressEvent.addEventListener(this.handleTileLoadProgress);
@@ -42,7 +43,10 @@ class CesiumMap {
 class StyleManager {
     constructor() {
         this.zoneBaseStyle = null;
-        this.polylineBaseStyle = null;
+        this.zonePolylineBaseStyle = null;
+
+        this.ozBaseStyle = null;
+        this.ozPolylineBaseStyle = null;
 
     }
 
@@ -51,8 +55,11 @@ class StyleManager {
     }
 
     async loadBaseStyles() {
-        this.zoneBaseStyle = await fetchStyle('Polygon');
-        this.polylineBaseStyle = await fetchStyle('Polyline');
+        this.zmrBaseStyle = await fetchStyle('Polygon', 1);
+        this.zmrPolylineBaseStyle = await fetchStyle('Polyline', 2);
+
+        this.ozBaseStyle = await fetchStyle('Polygon', 2);
+        this.ozPolylineBaseStyle = await fetchStyle('Polyline', 3);
     }
 }
 
@@ -69,12 +76,14 @@ class ObjectManager {
     async init() {
         this.zmr_source = new Cesium.CustomDataSource('zmr');
         await this.loadZMR();
+        this.oz_source = new Cesium.CustomDataSource('oz');
+        await this.loadOZ();
 
-        this.viewer.dataSources.add(this.zmr_source).then(
-            () => {
-                this.viewer.zoomTo(this.zmr_source.entities)
-            }
-        )
+        this.viewer.dataSources.add(this.zmr_source)
+        this.viewer.dataSources.add(this.oz_source).then((datasource) => {
+            this.viewer.zoomTo(datasource)
+        })
+
         this.leftClickOnObject(this.highlightObject)
     }
 
@@ -86,12 +95,29 @@ class ObjectManager {
             const zoneEntity = new Cesium.Entity({
                 id: zmr.id,
                 name: zmr.properties.name,
-                polygon: this.styleManager.zoneBaseStyle,
-                polyline: this.styleManager.polylineBaseStyle,
+                polygon: this.styleManager.zmrBaseStyle,
+                polyline: this.styleManager.zmrPolylineBaseStyle,
             })
             zoneEntity.polygon.hierarchy = Cesium.Cartesian3.fromDegreesArray(zoneCoordinates)
             zoneEntity.polyline.positions = Cesium.Cartesian3.fromDegreesArray(zoneCoordinates)
             this.zmr_source.entities.add(zoneEntity)
+        }
+    }
+
+    async loadOZ() {
+        const zones = await ApiService.getOZ();
+        for (const oz of zones.features) {
+            const zoneCoordinates = oz.geometry.coordinates.flat(Infinity)
+
+            const zoneEntity = new Cesium.Entity({
+                id: oz.id,
+                name: oz.properties.name,
+                polygon: this.styleManager.ozBaseStyle,
+                polyline: this.styleManager.ozPolylineBaseStyle,
+            })
+            zoneEntity.polygon.hierarchy = Cesium.Cartesian3.fromDegreesArray(zoneCoordinates)
+            zoneEntity.polyline.positions = Cesium.Cartesian3.fromDegreesArray(zoneCoordinates)
+            this.oz_source.entities.add(zoneEntity)
         }
     }
 
