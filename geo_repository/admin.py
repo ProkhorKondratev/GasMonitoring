@@ -1,6 +1,13 @@
 from django.contrib.gis import admin
-from .models import ZMR, ZMRGeometry, OZ, OZGeometry
+from .models import ZMR, ZMRGeometry, OZ, OZGeometry, ProtectedObject, ProtectedObjectGeometry
 from geo_repository.mixins import LifeCycleUpdateMixin
+from django.contrib.gis.forms import OSMWidget
+
+
+class CustomGeoWidget(OSMWidget):
+    map_srid = 4326
+    display_raw = True
+    supports_3d = False
 
 
 class ZoneBaseInline(admin.TabularInline):
@@ -23,8 +30,11 @@ class ZoneBaseAdmin(admin.ModelAdmin):
     ]
 
     fieldsets = (
-        ('Зона', {
+        ('Параметры', {
             'fields': ('is_show', 'name', 'description'),
+        }),
+        ('Охраняемый объект', {
+            'fields': ('protected_object', ),
         }),
     )
 
@@ -41,13 +51,16 @@ class ZoneBaseAdmin(admin.ModelAdmin):
         self.model.objects.all().update(is_show=False)
 
 
-class ZoneGeometryBaseAdmin(LifeCycleUpdateMixin, admin.ModelAdmin):
-    list_display = ('id', 'zone', 'is_relevant')
-    readonly_fields = ('zone',)
+class ZoneGeometryBaseAdmin(LifeCycleUpdateMixin, admin.GISModelAdmin):
+    gis_widget = CustomGeoWidget
+
+    list_display = ('id', 'parent_object', 'is_relevant')
+    list_display_links = ('id', 'parent_object',)
+    readonly_fields = ('parent_object',)
     list_filter = ('is_relevant', 'date_start', 'date_end')
     fieldsets = (
-        ('', {
-            'fields': ('zone',),
+        ('Охраняемый объект', {
+            'fields': ('parent_object',),
         }),
         ('Геометрия', {
             'fields': ('geom',),
@@ -63,6 +76,10 @@ class OZGeometryInline(ZoneBaseInline):
     model = OZGeometry
 
 
+class ProtectedObjectGeometryInline(ZoneBaseInline):
+    model = ProtectedObjectGeometry
+
+
 @admin.register(ZMR)
 class ZMRAdmin(ZoneBaseAdmin):
     inlines = [ZMRGeometryInline]
@@ -73,6 +90,16 @@ class OZAdmin(ZoneBaseAdmin):
     inlines = [OZGeometryInline]
 
 
+@admin.register(ProtectedObject)
+class ProtectedObjectAdmin(ZoneBaseAdmin):
+    inlines = [ProtectedObjectGeometryInline]
+    fieldsets = (
+        ('Параметры', {
+            'fields': ('is_show', 'name', 'description'),
+        }),
+    )
+
+
 @admin.register(ZMRGeometry)
 class ZMRGeometryAdmin(ZoneGeometryBaseAdmin):
     pass
@@ -80,4 +107,9 @@ class ZMRGeometryAdmin(ZoneGeometryBaseAdmin):
 
 @admin.register(OZGeometry)
 class OZGeometryAdmin(ZoneGeometryBaseAdmin):
+    pass
+
+
+@admin.register(ProtectedObjectGeometry)
+class ProtectedObjectGeometryAdmin(ZoneGeometryBaseAdmin):
     pass

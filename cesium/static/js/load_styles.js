@@ -62,9 +62,13 @@ class PolylineStyle {
 class PolygonStyle {
     constructor(base_style) {
         this.show = base_style.show;
-        this.height = base_style.height;
+        if (base_style.height) {
+            this.height = base_style.height;
+        }
         this.heightReference = base_style.heightReference;
-        this.extrudedHeight = base_style.extrudedHeight;
+        if (base_style.extrudedHeight) {
+            this.extrudedHeight = base_style.extrudedHeight;
+        }
         this.extrudedHeightReference = base_style.extrudedHeightReference;
         this.stRotation = base_style.stRotation;
         this.fill = base_style.fill;

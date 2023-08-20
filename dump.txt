@@ -1,0 +1,6 @@
+create:
+pg_dump -U prokhor -d GasMonitoring -f путь/GasMonitoring/GasMonitoring.sql
+
+load:
+psql -U prokhor -d GasMonitoring -f путь/GasMonitoring/GasMonitoring.sql
+
