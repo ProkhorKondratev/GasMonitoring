@@ -117,7 +117,7 @@ class OZGeometryViewSet(ModelViewSet):
         return queryset
 
 
-class ProtectedObjectSerializer(GeoFeatureModelSerializer):
+class ProtectionZonesSerializer(GeoFeatureModelSerializer):
     geom = GeometrySerializerMethodField()
 
     @staticmethod
@@ -128,10 +128,8 @@ class ProtectedObjectSerializer(GeoFeatureModelSerializer):
         related_oz = obj.protection_oz.first()
         oz_geom = related_oz.oz_geometry.get(is_relevant=True) if related_oz else None
 
-        protected_object_geom = obj.protected_object_geometry.get(is_relevant=True)
-
-        if zone_geom and oz_geom and protected_object_geom:
-            return GeometryCollection([zone_geom.geom, oz_geom.geom]).union(protected_object_geom.geom)
+        if zone_geom and oz_geom:
+            return GeometryCollection([zone_geom.geom, oz_geom.geom])
 
     class Meta:
         model = ProtectedObject
@@ -139,15 +137,15 @@ class ProtectedObjectSerializer(GeoFeatureModelSerializer):
         fields = '__all__'
 
 
-class ProtectedObjectViewSet(ModelViewSet):
+class ProtectionZonesViewSet(ModelViewSet):
     queryset = ProtectedObject.objects.all()
-    serializer_class = ProtectedObjectSerializer
+    serializer_class = ProtectionZonesSerializer
 
     def get_queryset(self):
         queryset = ProtectedObject.objects.all()
         is_show = self.request.query_params.get('is_show', None)
         if is_show is not None:
-            queryset = queryset.filter(is_show=is_show)
+            queryset = queryset.filter(is_show=True)
         return queryset
 
 

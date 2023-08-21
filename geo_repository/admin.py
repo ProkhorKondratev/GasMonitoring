@@ -5,7 +5,7 @@ from django.contrib.gis.forms import OSMWidget
 
 
 class CustomGeoWidget(OSMWidget):
-    map_srid = 4326
+    map_srid = 3857
     display_raw = True
     supports_3d = False
 
@@ -20,7 +20,7 @@ class ZoneBaseInline(admin.TabularInline):
 
 
 class ZoneBaseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_show', 'name')
+    list_display = ('id', 'is_show', 'name', 'protected_object')
     list_display_links = ('id', 'name',)
     search_fields = ('name',)
     ordering = ('-id',)
@@ -66,6 +66,7 @@ class ZoneGeometryBaseAdmin(LifeCycleUpdateMixin, admin.GISModelAdmin):
             'fields': ('geom',),
         }),
     )
+    search_fields = ('parent_object__name',)
 
 
 class ZMRGeometryInline(ZoneBaseInline):
@@ -92,6 +93,7 @@ class OZAdmin(ZoneBaseAdmin):
 
 @admin.register(ProtectedObject)
 class ProtectedObjectAdmin(ZoneBaseAdmin):
+    list_display = ('id', 'is_show', 'name')
     inlines = [ProtectedObjectGeometryInline]
     fieldsets = (
         ('Параметры', {

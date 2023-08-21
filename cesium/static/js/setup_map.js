@@ -22,16 +22,19 @@ class CesiumMap {
         this.viewer = await fetchViewer(this.containerId);
         this.viewer.extend(Cesium.viewerDragDropMixin);
 
-        this.viewer.dataSources.dataSourceAdded.addEventListener(this.handleDataSourceAdded.bind(this));
+        this.dataSourceAddedListener = this.handleDataSourceAdded.bind(this);
+        this.viewer.dataSources.dataSourceAdded.addEventListener(this.dataSourceAddedListener);
     }
 
     handleDataSourceAdded(dataSourceCollection, dataSource) {
         const loadingOverlay = document.getElementById('loading-overlay');
-        if (dataSourceCollection.length > 0) {
+        if (dataSource.name === 'protection_objects') {
             loadingOverlay.animate([{opacity: 1}, {opacity: 0}], {duration: 500}).onfinish = () => {
                 loadingOverlay.style.display = 'none';
             }
             console.log('Карта загружена');
+
+            this.viewer.dataSources.dataSourceAdded.removeEventListener(this.dataSourceAddedListener);
         } else {
             loadingOverlay.style.display = 'flex';
         }
@@ -64,62 +67,157 @@ class ObjectManager {
     }
 
     async init() {
-        await this.loadProtectedObjects();
+        this.loadProtectionZones();
+        this.loadProtectionObjects();
+
         this.leftClickOnObject(this.highlightObject)
     }
 
-    async loadProtectedObjects() {
-        const protectedObjects = await ApiService.getProtectedObjects();
+    async loadProtectionZones() {
+        const protectionZones = await ApiService.getProtectionZones();
 
-        protectedObjects.features.map(async (object) => {
-            const ds = new Cesium.GeoJsonDataSource(`protected_object_${object.id}`);
+        protectionZones.features.map(async (zone) => {
+            const ds = new Cesium.GeoJsonDataSource(`protection_zones_${zone.id}`);
+
             this.viewer.dataSources.add(ds);
+            await ds.load(zone);
 
-            await ds.load(object);
+            if (ds.entities.values.length === 2) {
+                const [zmr, oz] = ds.entities.values;
+                ds.entities.removeAll();
 
-            const [zmr, oz, protectedObject] = ds.entities.values;
+                const zmrPositions = zmr.polygon?.hierarchy.getValue()?.positions;
+                const ozPositions = oz.polygon?.hierarchy.getValue()?.positions;
 
-            const zmrPositions = zmr.polygon.hierarchy.getValue().positions;
-            const ozPositions = oz.polygon.hierarchy.getValue().positions;
-            const protectedObjectPositions = protectedObject.polyline.positions.getValue();
+                if (zmrPositions && ozPositions) {
+                    oz.polygon = this.styleManager.ozBaseStyle;
+                    oz.polyline = this.styleManager.ozPolylineBaseStyle;
+                    oz.polygon.hierarchy = ozPositions;
+                    oz.polyline.positions = ozPositions;
 
-            oz.polygon = this.styleManager.ozBaseStyle;
-            oz.polyline = this.styleManager.ozPolylineBaseStyle;
-            oz.polygon.hierarchy = ozPositions;
-            oz.polyline.positions = ozPositions;
+                    const zonesHierarchy = {
+                        positions: zmrPositions,
+                        holes: [{positions: ozPositions}]
+                    };
 
-            protectedObject.polyline = this.styleManager.tubeBaseStyle;
+                    const zones = new Cesium.Entity({
+                        id: `zmr_${zone.id}`,
+                        name: zmr.name,
+                        polygon: this.styleManager.zmrBaseStyle,
+                        polyline: this.styleManager.zmrPolylineBaseStyle
+                    });
 
-            ds.entities.remove(zmr);
-            ds.entities.remove(oz);
-            ds.entities.remove(protectedObject);
+                    zones.polygon.hierarchy = zonesHierarchy;
+                    zones.polyline.positions = zmrPositions;
 
-            const zonesHierarchy = {
-                positions: zmrPositions,
-                holes: [{positions: ozPositions}]
-            };
+                    ds.entities.add(zones);
+                    ds.entities.add(oz);
+                }
+            } else if (ds.entities.values.length > 2) {
+                console.log('Получено больше 2-х объектов', zone.id);
+                const entities = ds.entities.values;
+                ds.entities.removeAll();
 
-            const zones = new Cesium.Entity({
-                id: `zmr_${object.id}`,
-                name: zmr.name,
-                polygon: this.styleManager.zmrBaseStyle,
-                polyline: this.styleManager.zmrPolylineBaseStyle
-            });
+                for (let i = 0; i < entities.length; i += 2) {
+                    const zmr = entities[i];
+                    const oz = entities[i + 1];
 
-            zones.polygon.hierarchy = zonesHierarchy;
-            zones.polyline.positions = zmrPositions;
+                    const zmrPositions = zmr.polygon?.hierarchy.getValue()?.positions;
+                    const ozPositions = oz.polygon?.hierarchy.getValue()?.positions;
 
-            protectedObject.polyline.positions = protectedObjectPositions;
+                    if (zmrPositions && ozPositions) {
+                        oz.polygon = this.styleManager.ozBaseStyle;
+                        oz.polyline = this.styleManager.ozPolylineBaseStyle;
+                        oz.polygon.hierarchy = ozPositions;
+                        oz.polyline.positions = ozPositions;
 
-            ds.entities.add(zones);
-            ds.entities.add(oz);
-            ds.entities.add(protectedObject);
+                        const zonesHierarchy = {
+                            positions: zmrPositions,
+                            holes: [{positions: ozPositions}]
+                        };
 
-            this.viewer.zoomTo(ds);
+                        const zones = new Cesium.Entity({
+                            id: `zmr_${zone.id}_${i}`,
+                            name: zmr.name,
+                            polygon: this.styleManager.zmrBaseStyle,
+                            polyline: this.styleManager.zmrPolylineBaseStyle
+                        });
 
-            return ds;
-        });
+                        zones.polygon.hierarchy = zonesHierarchy;
+                        zones.polyline.positions = zmrPositions;
+
+                        ds.entities.add(zones);
+                        ds.entities.add(oz);
+                    }
+                }
+            } else {
+                console.log('Ошибка загрузки зоны', zone.id);
+            }
+
+            // if (ds.entities.values.length !== 2) {
+            //     console.log('Ошибка загрузки зоны', zone.id);
+            //     console.log(ds.entities.values, ds.entities.values.length);
+            // }
+            //
+            // const [zmr, oz] = ds.entities.values;
+            // ds.entities.removeAll();
+            //
+            // if (!zmr || !oz) {
+            //     return;
+            // }
+            //
+            // const zmrPositions = zmr.polygon?.hierarchy.getValue()?.positions;
+            // const ozPositions = oz.polygon?.hierarchy.getValue()?.positions;
+            //
+            // if (!zmrPositions || !ozPositions) {
+            //     return;
+            // }
+            //
+            // oz.polygon = this.styleManager.ozBaseStyle;
+            // oz.polyline = this.styleManager.ozPolylineBaseStyle;
+            // oz.polygon.hierarchy = ozPositions;
+            // oz.polyline.positions = ozPositions;
+            //
+            // const zonesHierarchy = {
+            //     positions: zmrPositions,
+            //     holes: [{positions: ozPositions}]
+            // };
+            //
+            // const zones = new Cesium.Entity({
+            //     id: `zmr_${zone.id}`,
+            //     name: zmr.name,
+            //     polygon: this.styleManager.zmrBaseStyle,
+            //     polyline: this.styleManager.zmrPolylineBaseStyle
+            // });
+            //
+            // zones.polygon.hierarchy = zonesHierarchy;
+            // zones.polyline.positions = zmrPositions;
+            //
+            // ds.entities.add(zones);
+            // ds.entities.add(oz);
+        })
     }
+
+    async loadProtectionObjects() {
+        const protectionObjects = await ApiService.getProtectedObjects();
+
+        const protectionObjectsDataSource = new Cesium.GeoJsonDataSource('protection_objects');
+        this.viewer.dataSources.add(protectionObjectsDataSource);
+
+        await protectionObjectsDataSource.load(protectionObjects);
+
+        for (const object of protectionObjectsDataSource.entities.values) {
+            if (Cesium.defined(object.polyline)) {
+                const objectPosition = object.polyline.positions.getValue();
+                object.polyline = this.styleManager.tubeBaseStyle;
+                object.polyline.positions = objectPosition;
+            } else {
+                console.log('Ошибка загрузки охраняемого объекта', object.id);
+            }
+        }
+
+    }
+
 
     // async loadZMR() {
     //     const zones = await ApiService.getZMR();

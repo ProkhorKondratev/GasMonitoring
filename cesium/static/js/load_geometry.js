@@ -17,9 +17,18 @@ class ApiService {
         }
     }
 
+    static async getProtectionZones() {
+        try {
+            const response = await fetch(`/api/protection_zones_geom/?is_show`)
+            return await response.json()
+        } catch (error) {
+            console.error('Ошибка при получении охраняемых объектов:', error)
+        }
+    }
+
     static async getProtectedObjects() {
         try {
-            const response = await fetch(`/api/protected_object/`)
+            const response = await fetch(`/api/protected_object_geom/?is_show`)
             return await response.json()
         } catch (error) {
             console.error('Ошибка при получении охраняемых объектов:', error)

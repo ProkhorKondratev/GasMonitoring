@@ -1,11 +1,11 @@
-import json
-from datetime import datetime
-
+from django.contrib.gis.geos import GeometryCollection, GEOSGeometry
 import psycopg2
-from geo_repository.models import ZMR, ZMRGeometry, OZ, OZGeometry
+from geo_repository.models import ZMR, ZMRGeometry, OZ, OZGeometry, ProtectedObject, ProtectedObjectGeometry
+from datetime import datetime
+from django.db.models import Q
 
 
-class OZ_Object:
+class OZObject:
     def __init__(self, id, name, geom, lpu=None, db=None, unique_id=None):
         self.id = id
         self.name = name
@@ -24,7 +24,7 @@ class OZ_Object:
         return self.__str__()
 
 
-class Zone:
+class ZoneObject:
     def __init__(self, id, name, geom, lpu=None, db=None, unique_id=None):
         self.id = id
         self.name = name
@@ -43,18 +43,23 @@ class Zone:
         return self.__str__()
 
 
-class ViolObject:
-    def __init__(self, id, object_type, object_subtype1, object_subtype2, geom, lpu=None, db=None):
+class ProtectedObjectObject:
+    def __init__(self, id, name, geom, lpu=None, db=None, unique_id=None):
         self.id = id
-        self.object_type = object_type
-        self.object_subtype1 = object_subtype1
-        self.object_subtype2 = object_subtype2
-        self.geom = geom
+        self.name = name
+        self.geom = GEOSGeometry(geom)
         self.lpu = lpu
         self.db = db
+        self.unique_id = unique_id
+
+    def union_geometry(self, geom):
+        self.geom = self.geom.union(GEOSGeometry(geom))
+
+    def make_unique_id(self):
+        return f'{self.id}_{self.lpu}_{self.db}_{self.name}'
 
     def __str__(self):
-        return f'{self.db}_{self.lpu}_{self.object_type}-{self.object_subtype1}-{self.object_subtype2} [{self.id}]'
+        return f'{self.name}[{self.id}]'
 
     def __repr__(self):
         return self.__str__()
@@ -91,7 +96,7 @@ class LegacyDB:
 
     def get_lpu_names(self):
         lpus = self.execute("SELECT schema_name FROM information_schema.schemata")
-        return [lp[0] for lp in lpus[:3]]
+        return [lp[0] for lp in lpus]
 
     def get_latest_zmr_table(self, schema, date=None):
         condition = f"AND table_name LIKE 'ZMR_all_{date}'" if date else "AND table_name LIKE 'ZMR_all_%'"
@@ -99,14 +104,6 @@ class LegacyDB:
             f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema}' {condition} ORDER BY table_name DESC")
         if zmr_table:
             return zmr_table[0][0]
-
-    def get_latest_object_table(self, schema, date=None):
-        condition = f"AND table_name LIKE 'air_objects__{date}'" if date else "AND table_name LIKE 'airp_objects__%' " \
-                                                                              "AND table_name NOT LIKE '%_notselected'"
-        object_table = self.execute(
-            f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema}' {condition} ORDER BY table_name DESC")
-        if object_table:
-            return object_table[0][0]
 
     def get_latest_oz_table(self, schema, date=None):
         condition = f"AND table_name LIKE 'OZ_all_{date}'" if date else "AND table_name LIKE 'OZ_all_%'"
@@ -121,20 +118,8 @@ class LegacyDB:
             zmr_table = self.get_latest_zmr_table(schema)
             if zmr_table:
                 zmr = self.execute(f'SELECT id, name, geom FROM {schema}."{zmr_table}" WHERE geom IS NOT NULL')
-                zones.extend([Zone(id=z[0], name=z[1], geom=z[2], lpu=schema, db=self.dbname) for z in zmr])
+                zones.extend([ZoneObject(id=z[0], name=z[1], geom=z[2], lpu=schema, db=self.dbname) for z in zmr])
         return zones
-
-    def get_objects(self):
-        objects = []
-        for schema in self.lpu_names:
-            object_table = self.get_latest_object_table(schema)
-            if object_table:
-                viol_objects = self.execute(
-                    f'SELECT id, type, podtype, geomorf, geom FROM {schema}."{object_table}" '
-                    f'WHERE geom IS NOT NULL AND type IS NOT NULL AND podtype IS NOT NULL AND geomorf IS NOT NULL')
-                objects.extend([ViolObject(id=o[0], object_type=o[1], object_subtype1=o[2], object_subtype2=o[3],
-                                           geom=o[4], lpu=schema, db=self.dbname) for o in viol_objects])
-        return objects
 
     def get_oz(self):
         oz = []
@@ -143,95 +128,100 @@ class LegacyDB:
             if oz_table:
                 oz_objects = self.execute(
                     f'SELECT id, name, geom FROM {schema}."{oz_table}" WHERE geom IS NOT NULL')
-                oz.extend([OZ_Object(id=o[0], name=o[1], geom=o[2], lpu=schema, db=self.dbname) for o in oz_objects])
+                oz.extend([OZObject(id=o[0], name=o[1], geom=o[2], lpu=schema, db=self.dbname) for o in oz_objects])
         return oz
+
+    def get_protected_objects(self):
+        protected_objects = []
+        all_protected_objects = self.execute(f'SELECT id, name, geom FROM "public"."tubes_tg" WHERE end_date IS NULL AND geom IS NOT NULL')
+        for pr_object in all_protected_objects:
+            if pr_object[1] in [po.name for po in protected_objects]:
+                for po in protected_objects:
+                    if po.name == pr_object[1]:
+                        po.union_geometry(pr_object[2])
+            else:
+                protected_objects.append(ProtectedObjectObject(id=pr_object[0], name=pr_object[1], geom=pr_object[2], db=self.dbname))
+        return protected_objects
 
     def close(self):
         self.cursor.close()
         self.conn.close()
 
 
-class ZonesManager:
+class ProtectedObjectManager:
     def __init__(self, objects):
-        self.legacy_zmr = objects
+        self.legacy_pr_obj = objects
+        self.save_all_to_django()
+
+    def save_all_to_django(self):
+        ProtectedObject.objects.all().delete()
+        ProtectedObjectGeometry.objects.all().delete()
+
+        protected_objects = []
+        protected_object_geometries = []
+
+        for pr_object in self.legacy_pr_obj:
+            new_pr_object = ProtectedObject(name=pr_object.name)
+            protected_objects.append(new_pr_object)
+            new_geom_object = ProtectedObjectGeometry(parent_object=new_pr_object, geom=GeometryCollection(pr_object.geom))
+            protected_object_geometries.append(new_geom_object)
+
+        ProtectedObject.objects.bulk_create(protected_objects)
+        ProtectedObjectGeometry.objects.bulk_create(protected_object_geometries)
+
+
+class ZoneManager:
+    def __init__(self, zones):
+        self.legacy_zones = zones
         self.save_all_to_django()
 
     def save_all_to_django(self):
         ZMR.objects.all().delete()
         ZMRGeometry.objects.all().delete()
 
-        zones = []
-        zones_geometries = []
+        zmr_objects = []
+        zmr_geometries = []
 
-        for zmr in self.legacy_zmr:
-            zone = ZMR(name=zmr.name)
-            zones.append(zone)
+        for zone in self.legacy_zones:
+            protected_object = ProtectedObject.objects.filter(
+                Q(protected_object_geometry__geom__intersects=zone.geom) &
+                Q(name=zone.name)
+            ).first()
+            new_zmr_object = ZMR(protected_object=protected_object, name=zone.name)
+            zmr_objects.append(new_zmr_object)
 
-            zone_geometry = ZMRGeometry(zone=zone, geom=zmr.geom)
-            zones_geometries.append(zone_geometry)
+            new_geom_object = ZMRGeometry(parent_object=new_zmr_object, geom=zone.geom)
+            zmr_geometries.append(new_geom_object)
 
-        ZMR.objects.bulk_create(zones)
-        ZMRGeometry.objects.bulk_create(zones_geometries)
-
-
-class ObjectsManager:
-    def __init__(self, objects):
-        self.objects = objects
-        self.load_objects_relations()
-
-    def load_objects_relations(self):
-        self.save_all_to_django()
-
-    def save_all_to_django(self):
-        Object.objects.all().delete()
-        ObjectGeometry.objects.all().delete()
-
-        viol_objects = []
-        objects_geometries = []
-
-        for obj in self.objects:
-            object_type = ObjectType.objects.filter(value=obj.object_type).first()
-            object_subtype1 = ObjectSubType1.objects.filter(value=obj.object_subtype1,
-                                                            object_type=object_type).first()
-            object_subtype2 = ObjectSubType2.objects.filter(value=obj.object_subtype2,
-                                                            object_subtype1=object_subtype1).first()
-
-            viol_object = Object(name='Объект нарушения',
-                                 object_type=object_type,
-                                 object_subtype1=object_subtype1,
-                                 object_subtype2=object_subtype2,
-                                 fill_style='#000000FF',
-                                 border_style='#000000FF',
-                                 border_width=3, )
-            viol_objects.append(viol_object)
-
-            object_geometry = ObjectGeometry(object=viol_object, geom=obj.geom)
-            objects_geometries.append(object_geometry)
-
-        Object.objects.bulk_create(viol_objects)
-        ObjectGeometry.objects.bulk_create(objects_geometries)
+        ZMR.objects.bulk_create(zmr_objects)
+        ZMRGeometry.objects.bulk_create(zmr_geometries)
 
 
 class OZManager:
-    def __init__(self, objects):
-        self.legacy_oz = objects
+    def __init__(self, oz):
+        self.legacy_oz = oz
         self.save_all_to_django()
 
     def save_all_to_django(self):
         OZ.objects.all().delete()
         OZGeometry.objects.all().delete()
 
-        oz = []
+        oz_objects = []
         oz_geometries = []
 
-        for oz_obj in self.legacy_oz:
-            zone = OZ(name=oz_obj.name)
-            oz.append(zone)
+        for oz in self.legacy_oz:
+            protected_object = ProtectedObject.objects.filter(
+                Q(protected_object_geometry__geom__intersects=oz.geom) &
+                Q(name=oz.name)
+            ).first()
 
-            zone_geometry = OZGeometry(zone=zone, geom=oz_obj.geom)
-            oz_geometries.append(zone_geometry)
+            new_oz_object = OZ(protected_object=protected_object, name=oz.name)
+            oz_objects.append(new_oz_object)
 
-        OZ.objects.bulk_create(oz)
+            new_geom_object = OZGeometry(parent_object=new_oz_object, geom=oz.geom)
+            oz_geometries.append(new_geom_object)
+
+        OZ.objects.bulk_create(oz_objects)
         OZGeometry.objects.bulk_create(oz_geometries)
 
 
@@ -240,6 +230,23 @@ db_list = ['transgaz_samara', 'gazprom_dobycha_krasnodar', 'gazprom_pererabotka'
            'transgaz_moskva', 'transgaz_nizhniy_novgorod', 'transgaz_saratov', 'transgaz_spb', 'transgaz_stavropol',
            'transgaz_surgut', 'transgaz_tomsk', 'transgaz_tomsk_silasibiri', 'transgaz_ufa', 'transgaz_ugorsk',
            'transgaz_uhta', 'transgaz_volgograd']
+
+
+def load_protected():
+    start_time = datetime.now()
+
+    pr_objects = []
+
+    for db in db_list[:1]:
+        legacy_db = LegacyDB(db_name=db)
+        pr_objects.extend(legacy_db.get_protected_objects())
+        legacy_db.close()
+
+    print(f'Получено {len(pr_objects)} охраняемых объектов. Запуск проверки и загрузки в БД Django')
+    ProtectedObjectManager(pr_objects)
+
+    end_time = datetime.now()
+    print(f'Загрузка завершена за {end_time - start_time}')
 
 
 def load_zones():
@@ -252,25 +259,8 @@ def load_zones():
         zones.extend(legacy_db.get_zones())
         legacy_db.close()
 
-    print(f'Получено {len(zones)} зон. Запуск проверки и загрузки в БД Django')
-    ZonesManager(zones)
-
-    end_time = datetime.now()
-    print(f'Загрузка завершена за {end_time - start_time}')
-
-
-def load_objects():
-    start_time = datetime.now()
-
-    objects = []
-
-    for db in db_list[:1]:
-        legacy_db = LegacyDB(db_name=db)
-        objects.extend(legacy_db.get_objects())
-        legacy_db.close()
-
-    print(f'Получено {len(objects)} объектов нарушений. Запуск проверки и загрузки в БД Django')
-    ObjectsManager(objects)
+    print(f'Получено {len(zones)} зон минимальных расстояний. Запуск проверки и загрузки в БД Django')
+    ZoneManager(zones)
 
     end_time = datetime.now()
     print(f'Загрузка завершена за {end_time - start_time}')
@@ -279,15 +269,15 @@ def load_objects():
 def load_oz():
     start_time = datetime.now()
 
-    ozs = []
+    oz = []
 
     for db in db_list[:1]:
         legacy_db = LegacyDB(db_name=db)
-        ozs.extend(legacy_db.get_oz())
+        oz.extend(legacy_db.get_oz())
         legacy_db.close()
 
-    print(f'Получено {len(ozs)} охранных зон. Запуск проверки и загрузки в БД Django')
-    OZManager(ozs)
+    print(f'Получено {len(oz)} охранных зон. Запуск проверки и загрузки в БД Django')
+    OZManager(oz)
 
     end_time = datetime.now()
     print(f'Загрузка завершена за {end_time - start_time}')
