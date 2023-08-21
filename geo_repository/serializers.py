@@ -29,7 +29,7 @@ class ZMRViewSet(ModelViewSet):
         queryset = ZMR.objects.all()
         is_show = self.request.query_params.get('is_show', None)
         if is_show is not None:
-            queryset = queryset.filter(is_show=is_show)
+            queryset = queryset.filter(is_show=True)
         return queryset
 
 
@@ -85,7 +85,7 @@ class OZViewSet(ModelViewSet):
         queryset = OZ.objects.all()
         is_show = self.request.query_params.get('is_show', None)
         if is_show is not None:
-            queryset = queryset.filter(is_show=is_show)
+            queryset = queryset.filter(is_show=True)
         return queryset
 
 
@@ -107,7 +107,6 @@ class OZGeometryViewSet(ModelViewSet):
     serializer_class = OZGeometrySerializer
 
     def get_queryset(self):
-        # показываем только тот у которого в OZ.is_show = True
         queryset = OZGeometry.objects.filter(is_relevant=True)
         parent_id = self.request.query_params.get('id', None)
         if parent_id is not None:

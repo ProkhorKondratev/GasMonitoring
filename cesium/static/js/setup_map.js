@@ -76,9 +76,8 @@ class ObjectManager {
     async loadProtectionZones() {
         const protectionZones = await ApiService.getProtectionZones();
 
-        protectionZones.features.map(async (zone) => {
+        await Promise.all(protectionZones.features.map(async (zone) => {
             const ds = new Cesium.GeoJsonDataSource(`protection_zones_${zone.id}`);
-
             this.viewer.dataSources.add(ds);
             await ds.load(zone);
 
@@ -154,49 +153,10 @@ class ObjectManager {
                 console.log('Ошибка загрузки зоны', zone.id);
             }
 
-            // if (ds.entities.values.length !== 2) {
-            //     console.log('Ошибка загрузки зоны', zone.id);
-            //     console.log(ds.entities.values, ds.entities.values.length);
-            // }
-            //
-            // const [zmr, oz] = ds.entities.values;
-            // ds.entities.removeAll();
-            //
-            // if (!zmr || !oz) {
-            //     return;
-            // }
-            //
-            // const zmrPositions = zmr.polygon?.hierarchy.getValue()?.positions;
-            // const ozPositions = oz.polygon?.hierarchy.getValue()?.positions;
-            //
-            // if (!zmrPositions || !ozPositions) {
-            //     return;
-            // }
-            //
-            // oz.polygon = this.styleManager.ozBaseStyle;
-            // oz.polyline = this.styleManager.ozPolylineBaseStyle;
-            // oz.polygon.hierarchy = ozPositions;
-            // oz.polyline.positions = ozPositions;
-            //
-            // const zonesHierarchy = {
-            //     positions: zmrPositions,
-            //     holes: [{positions: ozPositions}]
-            // };
-            //
-            // const zones = new Cesium.Entity({
-            //     id: `zmr_${zone.id}`,
-            //     name: zmr.name,
-            //     polygon: this.styleManager.zmrBaseStyle,
-            //     polyline: this.styleManager.zmrPolylineBaseStyle
-            // });
-            //
-            // zones.polygon.hierarchy = zonesHierarchy;
-            // zones.polyline.positions = zmrPositions;
-            //
-            // ds.entities.add(zones);
-            // ds.entities.add(oz);
-        })
+            this.viewer.zoomTo(ds);
+        }));
     }
+
 
     async loadProtectionObjects() {
         const protectionObjects = await ApiService.getProtectedObjects();

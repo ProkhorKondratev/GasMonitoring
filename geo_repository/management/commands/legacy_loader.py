@@ -95,7 +95,7 @@ class LegacyDB:
         return self.cursor.fetchall()
 
     def get_lpu_names(self):
-        lpus = self.execute("SELECT schema_name FROM information_schema.schemata")
+        lpus = self.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%_lpu'")
         return [lp[0] for lp in lpus]
 
     def get_latest_zmr_table(self, schema, date=None):
@@ -133,14 +133,15 @@ class LegacyDB:
 
     def get_protected_objects(self):
         protected_objects = []
-        all_protected_objects = self.execute(f'SELECT id, name, geom FROM "public"."tubes_tg" WHERE end_date IS NULL AND geom IS NOT NULL')
-        for pr_object in all_protected_objects:
-            if pr_object[1] in [po.name for po in protected_objects]:
-                for po in protected_objects:
-                    if po.name == pr_object[1]:
-                        po.union_geometry(pr_object[2])
-            else:
-                protected_objects.append(ProtectedObjectObject(id=pr_object[0], name=pr_object[1], geom=pr_object[2], db=self.dbname))
+        for schema in self.lpu_names:
+            all_protected_objects = self.execute(f'SELECT id, name, geom, lpu FROM "public"."tubes_tg" WHERE end_date IS NULL AND geom IS NOT NULL AND lpu = \'{schema}\'')
+            for pr_object in all_protected_objects:
+                if pr_object[1] in [po.name for po in protected_objects]:
+                    for po in protected_objects:
+                        if po.name == pr_object[1]:
+                            po.union_geometry(pr_object[2])
+                else:
+                    protected_objects.append(ProtectedObjectObject(id=pr_object[0], name=pr_object[1], geom=pr_object[2], db=self.dbname, lpu=pr_object[3]))
         return protected_objects
 
     def close(self):
