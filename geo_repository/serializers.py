@@ -1,8 +1,12 @@
 from django.contrib.gis.geos import GeometryCollection
 from rest_framework_gis.serializers import GeoFeatureModelSerializer, GeometrySerializerMethodField
+from rest_framework.response import Response
 from rest_framework import serializers
 from .models import ZMR, ZMRGeometry, OZ, OZGeometry, ProtectedObject, ProtectedObjectGeometry
+from .geodata_models import GeoDataFile
 from rest_framework.viewsets import ModelViewSet
+import sqlite3
+from django.contrib.gis.geos import Point, MultiPoint
 
 
 class ZMRSerializer(serializers.ModelSerializer):
@@ -174,3 +178,49 @@ class ProtectedObjectGeometryViewSet(ModelViewSet):
         else:
             queryset = queryset.filter(parent_object__is_show=True)
         return queryset
+
+
+class GeoDataFileSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+    rectangle = GeometrySerializerMethodField()
+
+    @staticmethod
+    def get_rectangle(obj):
+        conn = sqlite3.connect(obj.path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT min_x, min_y, max_x, max_y FROM gpkg_contents")
+        result = cursor.fetchone()
+        conn.close()
+        return MultiPoint([
+            Point(result[0], result[1], srid=3857).transform(4326, clone=True),
+            Point(result[2], result[3], srid=3857).transform(4326, clone=True)
+        ]).envelope
+
+    @staticmethod
+    def get_url(obj):
+        return f'/tiles/relt/{obj.id}/{{z}}/{{x}}/{{y}}'
+
+    class Meta:
+        model = GeoDataFile
+        fields = '__all__'
+
+
+class GeoDataFileViewSet(ModelViewSet):
+    queryset = GeoDataFile.objects.all()
+    serializer_class = GeoDataFileSerializer
+    filterset_fields = '__all__'
+    search_fields = '__all__'
+
+    def create(self, request, *args, **kwargs):
+
+        # смотрим есть ли такой файл в базе
+        try:
+            obj = GeoDataFile.objects.get(path=request.data['path'])
+            # обновляем данные
+            obj.path = request.data['path']
+            obj.save()
+            return Response(status=200, data={'message': 'Обновлено'})
+
+        except GeoDataFile.DoesNotExist:
+            super().create(request, *args, **kwargs)
+            return Response(status=201, data={'message': 'Создано'})

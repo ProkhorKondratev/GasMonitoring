@@ -1,5 +1,6 @@
 from django.contrib.gis import admin
 from .models import ZMR, ZMRGeometry, OZ, OZGeometry, ProtectedObject, ProtectedObjectGeometry
+from .geodata_models import GeoDataFile
 from geo_repository.mixins import LifeCycleUpdateMixin
 from django.contrib.gis.forms import OSMWidget
 
@@ -115,3 +116,12 @@ class OZGeometryAdmin(ZoneGeometryBaseAdmin):
 @admin.register(ProtectedObjectGeometry)
 class ProtectedObjectGeometryAdmin(ZoneGeometryBaseAdmin):
     pass
+
+
+@admin.register(GeoDataFile)
+class GeoDataFileAdmin(admin.ModelAdmin):
+    list_display = ('name', 'data_type', 'path', 'created')
+    list_filter = ('name', 'path', 'created')
+    search_fields = ('name', 'path', 'created')
+
+    list_display_links = list_display

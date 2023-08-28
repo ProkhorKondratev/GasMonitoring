@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from .mixins import LifeCycleModelMixin
+from geo_repository.geodata_models import GeoDataFile
 
 
 class ProtectedObject(models.Model):

@@ -1,4 +1,4 @@
-.cesium-layers-panel {
+.layers-panel {
     display: block;
     position: absolute;
     box-sizing: content-box;
@@ -7,17 +7,18 @@
     width: 320px;
     margin-top: 5px;
     background-color: #fff;
-    padding: 15px;
+    padding: 10px;
     overflow: auto;
     border-radius: 10px;
     color: black;
     font-size: 18px;
+    font-weight: bold;
     font-family: sans-serif;
 
     transition: opacity 0.5s ease-in-out;
 }
 
-.cesium-layer-panel-btn {
+.layers-panel-btn {
     width: 32px;
     height: 32px;
     padding: 0;
@@ -27,32 +28,52 @@
     border: 1px solid #fff;
 }
 
-.cesium-layer-panel-btn:hover {
+.layers-panel-btn:hover {
     background-color: #eee;
     border: 1px solid #eee;
 }
 
-.cesium-layer-panel-btn svg {
+.layers-panel-btn svg {
     width: 20px;
     height: 20px;
     fill: #000;
 }
 
-.cesium-layer-panel-btn:hover svg {
+.layers-panel-btn:hover svg {
     width: 20px;
     height: 20px;
     fill: #000;
 }
 
-.cesium-layers-panel-body-datasource-sector-list {
-    list-style: none;
-    padding: 0;
-    margin-top: 5px;
-}
-
-.cesium-layers-panel-body-list-item {
-    padding: 5px 0;
-    border: 2px solid #eee;
+.layers-panel-datasource-sector {
+    display: block;
+    margin-bottom: 10px;
+    border: 1px solid #eee;
     border-radius: 5px;
-    margin-bottom: 5px;
+    padding: 5px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.layers-panel-item {
+    display: block;
+    margin-top: 5px;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    padding: 5px;
+    font-size: 12px;
+    font-weight: bold;
+
+    user-select: none;
+}
+
+.layers-panel-item-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.layers-panel-item-btn {
+    background-color: transparent;
+    border: none;
 }

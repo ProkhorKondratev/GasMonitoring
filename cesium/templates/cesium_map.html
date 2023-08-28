@@ -2,38 +2,41 @@
 {% load cesium-tags %}
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Title</title>
-    </head>
-    <body>
-        <script src="{% static 'libs/Cesium/Build/Cesium/Cesium.js' %}"></script>
-        <script src="{% static 'libs/draggable/draggable-source.js' %}"></script>
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script src="{% static 'libs/Cesium/Build/Cesium/Cesium.js' %}"></script>
+<script src="{% static 'libs/draggable/draggable-source.js' %}"></script>
 
-        <link rel="stylesheet" href="{% static 'libs/Cesium/Build/Cesium/Widgets/widgets.css' %}"/>
-        <link rel="stylesheet" href="{% static 'css/cesium_map.css' %}"/>
-        <link rel="stylesheet" href="{% static 'css/layerpanel.css' %}"/>
+<link rel="stylesheet" href="{% static 'libs/Cesium/Build/Cesium/Widgets/widgets.css' %}"/>
+<link rel="stylesheet" href="{% static 'css/cesium_map.css' %}"/>
+<link rel="stylesheet" href="{% static 'css/layerpanel.css' %}"/>
 
-        <div id="icon-container" style="display:none;">
-            {% get_icon "layers.svg" "svg" "layers-btn-svg" %}
-        </div>
+<div id="icon-container" style="display:none;">
+    {% get_icon "layers.svg" "svg" "layers-btn-svg" %}
+    {% get_icon "eye.svg" "svg" "show-layer-svg" %}
+    {% get_icon "eye-slash.svg" "svg" "hide-layer-svg" %}
+</div>
 
-        <div id="loading-overlay">
-            <div id="loading-spinner"></div>
-            <p>Загрузка...</p>
-        </div>
+<div id="loading-overlay">
+    <div id="loading-spinner"></div>
+    <p>Загрузка...</p>
+</div>
 
-        <div id="map">
-            <div id="cesiumContainer"></div>
-        </div>
+<div id="map">
+    <div id="cesiumContainer"></div>
+</div>
 
-        <script src="{% static 'js/load_providers.js' %}"></script>
-        <script src="{% static 'js/load_viewer.js' %}"></script>
-        <script src="{% static 'js/load_geometry.js' %}"></script>
-        <script src="{% static 'js/load_styles.js' %}"></script>
+<script src="{% static 'js/cesium-providers.js' %}"></script>
+<script src="{% static 'js/cesium-viewers.js' %}"></script>
+<script src="{% static 'js/cesium-api-loader.js' %}"></script>
+<script src="{% static 'js/cesium-styles.js' %}"></script>
 
-        <script src="{% static 'js/setup_map.js' %}"></script>
-        <script src="{% static 'js/layerpanel.js' %}"></script>
+<script src="{% static 'js/cesium-map.js' %}"></script>
+<script src="{% static 'js/cesium-layerpanel.js' %}"></script>
+<script src="{% static 'js/cesium-interactions.js' %}"></script>
 
-    </body>
+</body>
 </html>
