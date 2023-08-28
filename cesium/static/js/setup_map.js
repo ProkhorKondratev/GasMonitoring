@@ -16,6 +16,9 @@ class CesiumMap {
 
         this.objectManager = new ObjectManager(this.viewer, this.styleManager);
         await this.objectManager.init();
+
+        this.layerPanel = new LayerPanel(this.viewer, 'map')
+        this.layerPanel.init();
     }
 
     async setupCesium() {
@@ -77,7 +80,7 @@ class ObjectManager {
         const protectionZones = await ApiService.getProtectionZones();
 
         await Promise.all(protectionZones.features.map(async (zone) => {
-            const ds = new Cesium.GeoJsonDataSource(`protection_zones_${zone.id}`);
+            const ds = new Cesium.GeoJsonDataSource(zone.properties.name);
             this.viewer.dataSources.add(ds);
             await ds.load(zone);
 
@@ -113,7 +116,6 @@ class ObjectManager {
                     ds.entities.add(oz);
                 }
             } else if (ds.entities.values.length > 2) {
-                console.log('Получено больше 2-х объектов', zone.id);
                 const entities = ds.entities.values;
                 ds.entities.removeAll();
 
