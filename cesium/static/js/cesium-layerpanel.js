@@ -68,7 +68,9 @@ class LayerPanel {
             `;
             cesiumToolbar.appendChild(this.layerPanel);
 
-            this.layerPanel.querySelector(".layer-panel-header-btn").onclick = () => {
+            const toggleBtn = this.layerPanel.querySelector(".layer-panel-header-btn");
+            toggleBtn.onclick = () => {
+                toggleBtn.animate([{transform: 'rotate(0deg)'}, {transform: 'rotate(360deg)'}], {duration: 300})
                 if (this.dsGroup) this.dsGroup.collectLayers()
                 if (this.imgGroup) this.imgGroup.collectLayers()
             }
