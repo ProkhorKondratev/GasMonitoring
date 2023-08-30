@@ -120,8 +120,8 @@ class ProtectedObjectGeometryAdmin(ZoneGeometryBaseAdmin):
 
 @admin.register(GeoDataFile)
 class GeoDataFileAdmin(admin.ModelAdmin):
-    list_display = ('name', 'data_type', 'path', 'created')
-    list_filter = ('name', 'path', 'created')
-    search_fields = ('name', 'path', 'created')
+    list_display = ('name', 'is_show', 'data_type', 'created')
+    list_filter = list_display
+    search_fields = list_display
 
     list_display_links = list_display

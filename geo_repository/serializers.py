@@ -120,38 +120,6 @@ class OZGeometryViewSet(ModelViewSet):
         return queryset
 
 
-class ProtectionZonesSerializer(GeoFeatureModelSerializer):
-    geom = GeometrySerializerMethodField()
-
-    @staticmethod
-    def get_geom(obj):
-        related_zmr = obj.protection_zmr.first()
-        zone_geom = related_zmr.zmr_geometry.get(is_relevant=True) if related_zmr else None
-
-        related_oz = obj.protection_oz.first()
-        oz_geom = related_oz.oz_geometry.get(is_relevant=True) if related_oz else None
-
-        if zone_geom and oz_geom:
-            return GeometryCollection([zone_geom.geom, oz_geom.geom])
-
-    class Meta:
-        model = ProtectedObject
-        geo_field = "geom"
-        fields = '__all__'
-
-
-class ProtectionZonesViewSet(ModelViewSet):
-    queryset = ProtectedObject.objects.all()
-    serializer_class = ProtectionZonesSerializer
-
-    def get_queryset(self):
-        queryset = ProtectedObject.objects.all()
-        is_show = self.request.query_params.get('is_show', None)
-        if is_show is not None:
-            queryset = queryset.filter(is_show=True)
-        return queryset
-
-
 class ProtectedObjectGeometrySerializer(GeoFeatureModelSerializer):
     date_start = serializers.DateTimeField(format='%d.%m.%Y - %H:%M', read_only=True)
     date_end = serializers.DateTimeField(format='%d.%m.%Y - %H:%M', read_only=True)
@@ -180,21 +148,68 @@ class ProtectedObjectGeometryViewSet(ModelViewSet):
         return queryset
 
 
-class GeoDataFileSerializer(serializers.ModelSerializer):
-    url = serializers.SerializerMethodField()
-    rectangle = GeometrySerializerMethodField()
+class ProtectionZonesSerializer(serializers.ModelSerializer):
+    zmr_geom = GeometrySerializerMethodField()
+    oz_geom = GeometrySerializerMethodField()
 
     @staticmethod
-    def get_rectangle(obj):
-        conn = sqlite3.connect(obj.path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT min_x, min_y, max_x, max_y FROM gpkg_contents")
-        result = cursor.fetchone()
-        conn.close()
-        return MultiPoint([
-            Point(result[0], result[1], srid=3857).transform(4326, clone=True),
-            Point(result[2], result[3], srid=3857).transform(4326, clone=True)
-        ]).envelope
+    def get_zmr_geom(obj):
+        related_zmr = obj.protection_zmr.first()
+        zone_geom = related_zmr.zmr_geometry.get(is_relevant=True) if related_zmr else None
+        return zone_geom.geom if zone_geom else None
+
+    @staticmethod
+    def get_oz_geom(obj):
+        related_oz = obj.protection_oz.first()
+        oz_geom = related_oz.oz_geometry.get(is_relevant=True) if related_oz else None
+        return oz_geom.geom if oz_geom else None
+
+    # geom = GeometrySerializerMethodField()
+    #
+    # @staticmethod
+    # def get_geom(obj):
+    #     related_zmr = obj.protection_zmr.first()
+    #     zone_geom = related_zmr.zmr_geometry.get(is_relevant=True) if related_zmr else None
+    #
+    #     related_oz = obj.protection_oz.first()
+    #     oz_geom = related_oz.oz_geometry.get(is_relevant=True) if related_oz else None
+    #
+    #     if zone_geom and oz_geom:
+    #         return GeometryCollection([zone_geom.geom, oz_geom.geom])
+
+    class Meta:
+        model = ProtectedObject
+        fields = '__all__'
+
+
+class ProtectionZonesViewSet(ModelViewSet):
+    queryset = ProtectedObject.objects.all()
+    serializer_class = ProtectionZonesSerializer
+
+    def get_queryset(self):
+        queryset = ProtectedObject.objects.all()
+        is_show = self.request.query_params.get('is_show', None)
+        if is_show is not None:
+            queryset = queryset.filter(is_show=True)
+        return queryset
+
+
+class GeoDataFileSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    # rectangle = GeometrySerializerMethodField()
+    #
+    # @staticmethod
+    # def get_rectangle(obj):
+    #     conn = sqlite3.connect(obj.path)
+    #     cursor = conn.cursor()
+    #     cursor.execute("SELECT min_x, min_y, max_x, max_y FROM gpkg_contents")
+    #     result = cursor.fetchone()
+    #     conn.close()
+    #     return MultiPoint([
+    #         Point(result[0], result[1], srid=3857),
+    #         Point(result[2], result[3], srid=3857)], srid=3857) \
+    #         .envelope.transform(4326, clone=True)
 
     @staticmethod
     def get_url(obj):
@@ -208,15 +223,10 @@ class GeoDataFileSerializer(serializers.ModelSerializer):
 class GeoDataFileViewSet(ModelViewSet):
     queryset = GeoDataFile.objects.all()
     serializer_class = GeoDataFileSerializer
-    filterset_fields = '__all__'
-    search_fields = '__all__'
 
     def create(self, request, *args, **kwargs):
-
-        # смотрим есть ли такой файл в базе
         try:
             obj = GeoDataFile.objects.get(path=request.data['path'])
-            # обновляем данные
             obj.path = request.data['path']
             obj.save()
             return Response(status=200, data={'message': 'Обновлено'})
@@ -224,3 +234,10 @@ class GeoDataFileViewSet(ModelViewSet):
         except GeoDataFile.DoesNotExist:
             super().create(request, *args, **kwargs)
             return Response(status=201, data={'message': 'Создано'})
+
+    def get_queryset(self):
+        queryset = GeoDataFile.objects.all()
+        is_show = self.request.query_params.get('is_show', None)
+        if is_show is not None:
+            queryset = queryset.filter(is_show=True)
+        return queryset

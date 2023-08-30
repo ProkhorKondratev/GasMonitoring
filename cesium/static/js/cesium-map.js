@@ -34,7 +34,7 @@ class CesiumMap {
 
     handleDataSourceAdded(dataSourceCollection, dataSource) {
         const loadingOverlay = document.getElementById('loading-overlay');
-        if (dataSource.name === 'Охраняемые объекты') {
+        if (dataSource.name === 'Охраняемые объекты (трубопроводы)') {
             loadingOverlay.animate([{opacity: 1}, {opacity: 0}], {duration: 500}).onfinish = () => {
                 loadingOverlay.style.display = 'none';
             }
@@ -71,103 +71,78 @@ class ObjectManager {
     }
 
     async init() {
-        this.loadProtectionZones();
         this.loadProtectionObjects();
+        this.loadProtectionZones();
         this.loadOrtho()
     }
 
     async loadProtectionZones() {
         const protectionZones = await ApiService.getProtectionZones();
+        const ds = new Cesium.CustomDataSource('Охранные зоны');
 
-        await Promise.all(protectionZones.features.map(async (zone) => {
-            const ds = new Cesium.GeoJsonDataSource(zone.properties.name);
-            await ds.load(zone);
+        const createProtectionZone = (zone, zmrPositions, ozPositions = null) => {
+            let hierarchy = zmrPositions
+            if (ozPositions) {
+                hierarchy = {positions: zmrPositions, holes: [{positions: ozPositions}]}
 
-            if (ds.entities.values.length === 2) {
-                const [zmr, oz] = ds.entities.values;
-                ds.entities.removeAll();
+                const protectionOz = new Cesium.Entity({
+                    id: `oz_${zone.id}`,
+                    name: zone.name,
+                    polygon: this.styleManager.ozBaseStyle,
+                    polyline: this.styleManager.ozPolylineBaseStyle
+                });
 
-                const zmrPositions = zmr.polygon?.hierarchy.getValue()?.positions;
-                const ozPositions = oz.polygon?.hierarchy.getValue()?.positions;
-
-                if (zmrPositions && ozPositions) {
-                    const secZone = new Cesium.Entity({
-                        id: `oz_${zone.id}`,
-                        name: zmr.name,
-                        polygon: this.styleManager.ozBaseStyle,
-                        polyline: this.styleManager.ozPolylineBaseStyle
-                    });
-
-                    secZone.polygon.hierarchy = ozPositions;
-                    secZone.polyline.positions = ozPositions;
-
-
-                    const zonesHierarchy = {
-                        positions: zmrPositions,
-                        holes: [{positions: ozPositions}]
-                    };
-
-                    const zones = new Cesium.Entity({
-                        id: `zmr_${zone.id}`,
-                        name: zmr.name,
-                        polygon: this.styleManager.zmrBaseStyle,
-                        polyline: this.styleManager.zmrPolylineBaseStyle
-                    });
-
-                    zones.polygon.hierarchy = zonesHierarchy;
-                    zones.polyline.positions = zmrPositions;
-
-                    ds.entities.add(zones);
-                    ds.entities.add(secZone);
-                }
-            } else if (ds.entities.values.length > 2) {
-                const entities = ds.entities.values;
-                ds.entities.removeAll();
-
-                for (let i = 0; i < entities.length; i += 2) {
-                    const zmr = entities[i];
-                    const oz = entities[i + 1];
-
-                    const zmrPositions = zmr.polygon?.hierarchy.getValue()?.positions;
-                    const ozPositions = oz.polygon?.hierarchy.getValue()?.positions;
-
-                    if (zmrPositions && ozPositions) {
-                        oz.polygon = this.styleManager.ozBaseStyle;
-                        oz.polyline = this.styleManager.ozPolylineBaseStyle;
-                        oz.polygon.hierarchy = ozPositions;
-                        oz.polyline.positions = ozPositions;
-
-                        const zonesHierarchy = {
-                            positions: zmrPositions,
-                            holes: [{positions: ozPositions}]
-                        };
-
-                        const zones = new Cesium.Entity({
-                            id: `zmr_${zone.id}_${i}`,
-                            name: zmr.name,
-                            polygon: this.styleManager.zmrBaseStyle,
-                            polyline: this.styleManager.zmrPolylineBaseStyle
-                        });
-
-                        zones.polygon.hierarchy = zonesHierarchy;
-                        zones.polyline.positions = zmrPositions;
-
-                        ds.entities.add(zones);
-                        ds.entities.add(oz);
-                    }
-                }
-            } else {
-                console.log('Ошибка загрузки зоны', zone.id);
+                protectionOz.polygon.hierarchy = ozPositions;
+                protectionOz.polyline.positions = ozPositions;
+                ds.entities.add(protectionOz);
             }
-            this.viewer.dataSources.add(ds);
-            this.viewer.flyTo(ds);
-        }));
+
+            const protectionZone = new Cesium.Entity({
+                id: `zmr_${zone.id}`,
+                name: zone.name,
+                polygon: this.styleManager.zmrBaseStyle,
+                polyline: this.styleManager.zmrPolylineBaseStyle
+            });
+
+            protectionZone.polygon.hierarchy = hierarchy
+            protectionZone.polyline.positions = zmrPositions;
+
+            ds.entities.add(protectionZone);
+        }
+
+        const createProtectionOz = (zone, ozPositions) => {
+            const protectionOz = new Cesium.Entity({
+                id: `oz_${zone.id}`,
+                name: zone.name,
+                polygon: this.styleManager.ozBaseStyle,
+                polyline: this.styleManager.ozPolylineBaseStyle
+            });
+
+            protectionOz.polygon.hierarchy = ozPositions;
+            protectionOz.polyline.positions = ozPositions;
+
+            ds.entities.add(protectionOz);
+        }
+
+        for (const zone of protectionZones) {
+            const zmr = zone.zmr_geom
+            const oz = zone.oz_geom
+
+            let zmrPositions, ozPositions
+            if (zmr) {zmrPositions = Cesium.Cartesian3.fromDegreesArray(zmr.coordinates.flat(Infinity))}
+            if (oz) {ozPositions = Cesium.Cartesian3.fromDegreesArray(oz.coordinates.flat(Infinity))}
+
+            if (zmrPositions && ozPositions) {createProtectionZone(zone, zmrPositions, ozPositions)}
+            else if (zmrPositions) {createProtectionZone(zone, zmrPositions)}
+            else if (ozPositions) {createProtectionOz(zone, ozPositions)}
+        }
+        this.viewer.dataSources.add(ds);
     }
 
     async loadProtectionObjects() {
         const protectionObjects = await ApiService.getProtectedObjects();
 
-        const protectionObjectsDataSource = new Cesium.GeoJsonDataSource('Охраняемые объекты');
+        const protectionObjectsDataSource = new Cesium.GeoJsonDataSource('Охраняемые объекты (трубопроводы)');
         await protectionObjectsDataSource.load(protectionObjects);
         for (const object of protectionObjectsDataSource.entities.values) {
             if (Cesium.defined(object.polyline)) {
@@ -179,6 +154,7 @@ class ObjectManager {
             }
         }
 
+        this.viewer.zoomTo(protectionObjectsDataSource);
         this.viewer.dataSources.add(protectionObjectsDataSource);
     }
 

@@ -1,21 +1,31 @@
+:root {
+    --layers-panel-background: #fff;
+    --layers-panel-item-background: #fff;
+    --layers-panel-btn-background: #fff;
+    --layers-panel-btn-background-svg: #000;
+    --text-color: #000;
+}
+
 .layers-panel {
     display: block;
     position: absolute;
-    box-sizing: content-box;
     top: auto;
     right: 0;
     width: 320px;
     margin-top: 5px;
-    background-color: #fff;
+    background-color: var(--layers-panel-background);
     padding: 10px;
     overflow: auto;
+    max-height: 60vh;
     border-radius: 10px;
-    color: black;
-    font-size: 18px;
-    font-weight: bold;
-    font-family: sans-serif;
+    color: var(--text-color);
+    font: bold 18px/1.2 sans-serif;
+}
 
-    transition: opacity 0.5s ease-in-out;
+.layers-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .layers-panel-btn {
@@ -23,57 +33,68 @@
     height: 32px;
     padding: 0;
     vertical-align: middle;
-    background-color: #fff;
+    background-color: var(--layers-panel-btn-background);
     border-radius: 14%;
-    border: 1px solid #fff;
+    border: none;
+    cursor: pointer;
 }
 
 .layers-panel-btn:hover {
     background-color: #eee;
-    border: 1px solid #eee;
 }
 
 .layers-panel-btn svg {
     width: 20px;
     height: 20px;
-    fill: #000;
+    fill: var(--layers-panel-btn-background-svg)
 }
 
-.layers-panel-btn:hover svg {
-    width: 20px;
-    height: 20px;
-    fill: #000;
-}
-
-.layers-panel-datasource-sector {
+.layers-panel-dataSource-sector,
+.layers-panel-imageryLayer-sector,
+.layers-panel-entities-sector,
+.layers-panel-item {
     display: block;
     margin-bottom: 10px;
     border: 1px solid #eee;
     border-radius: 5px;
     padding: 5px;
-    font-size: 16px;
-    font-weight: bold;
+    font: bold 16px/1.2 sans-serif;
 }
 
 .layers-panel-item {
-    display: block;
-    margin-top: 5px;
-    border: 1px solid #eee;
-    border-radius: 5px;
-    padding: 5px;
     font-size: 12px;
-    font-weight: bold;
-
+    margin-top: 5px;
     user-select: none;
+    background-color: var(--layers-panel-item-background);
 }
 
 .layers-panel-item-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: move;
 }
 
-.layers-panel-item-btn {
+.layers-panel-item-buttons {
+    display: flex;
+}
+
+.layers-panel-item-btn,
+.layer-panel-header-btn {
+    padding: 0;
     background-color: transparent;
     border: none;
+    cursor: pointer;
+    margin-right: 5px;
+    transition: transform 0.3s ease-in-out;
+}
+
+.layers-panel-item-btn svg,
+.layer-panel-header-btn svg {
+    fill: var(--layers-panel-btn-background-svg);
+}
+
+.layers-panel-item-btn:hover,
+.layer-panel-header-btn:hover {
+    transform: scale(1.2);
 }

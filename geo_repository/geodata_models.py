@@ -1,12 +1,30 @@
-from django.db import models
+from django.contrib.gis.db import models
 from pathlib import Path
+import sqlite3
+from django.contrib.gis.geos import Point, MultiPoint
 
 
 class FileManager(models.Manager):
+    @staticmethod
+    def get_rectangle(geo_file):
+        if not geo_file.rectangle:
+            conn = sqlite3.connect(geo_file.path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT min_x, min_y, max_x, max_y FROM gpkg_contents")
+            result = cursor.fetchone()
+            conn.close()
+            return MultiPoint([
+                Point(result[0], result[1], srid=3857),
+                Point(result[2], result[3], srid=3857)], srid=3857) \
+                .envelope.transform(4326, clone=True)
+
     def create(self, **kwargs):
-        if 'path' in kwargs:
-            kwargs['name'] = Path(kwargs['path']).name
-        return super(FileManager, self).create(**kwargs)
+        file = super().create(**kwargs)
+        file.name = Path(file.path).name
+        file.rectangle = FileManager.get_rectangle(file)
+
+        file.save()
+        return file
 
 
 class File(models.Model):
@@ -79,6 +97,20 @@ class GeoDataFileSettings(models.Model):
     """
     Для хранения схемы данных файла с геоданными.
     """
+    rectangle = models.PolygonField(
+        verbose_name='Охват',
+        srid=4326,
+        dim=2,
+        null=True,
+        blank=True,
+        help_text='Охват тайлового слоя',
+    )
+
+    is_show = models.BooleanField(
+        verbose_name='Показывать на карте',
+        help_text='Показывать этот слой на карте',
+        default=True
+    )
 
     minimum_level = models.IntegerField(
         verbose_name='Минимальный масштаб',
@@ -150,7 +182,9 @@ class GeoDataFile(File, GeoDataFileSettings):
         elif self.path.endswith('dem.gpkg'):
             self.name = GeoDataTypes.DEM.label
             self.data_type = GeoDataTypes.DEM
-        super(GeoDataFile, self).save(*args, **kwargs)
+
+        self.rectangle = FileManager.get_rectangle(self)
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Файл с геоданными'

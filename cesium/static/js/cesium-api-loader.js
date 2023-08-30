@@ -1,22 +1,4 @@
 class ApiService {
-    static async getZMR() {
-        try {
-            const response = await fetch(`/api/zmr_geom/`)
-            return await response.json()
-        } catch (error) {
-            console.error('Ошибка при получении зон проектов:', error)
-        }
-    }
-
-    static async getOZ() {
-        try {
-            const response = await fetch(`/api/oz_geom/`)
-            return await response.json()
-        } catch (error) {
-            console.error('Ошибка при получении охранной зоны:', error)
-        }
-    }
-
     static async getProtectionZones() {
         try {
             const response = await fetch(`/api/protection_zones_geom/?is_show`)
@@ -37,10 +19,28 @@ class ApiService {
 
     static async getOrtho() {
         try {
-            const response = await fetch(`/api/geodata_files/`)
+            const response = await fetch(`/api/geodata_files/?is_show`)
             return await response.json()
         } catch (error) {
             console.error('Ошибка при получении ортофотопланов:', error)
         }
     }
+
+    // static async getZMR() {
+    //     try {
+    //         const response = await fetch(`/api/zmr_geom/`)
+    //         return await response.json()
+    //     } catch (error) {
+    //         console.error('Ошибка при получении зон проектов:', error)
+    //     }
+    // }
+    //
+    // static async getOZ() {
+    //     try {
+    //         const response = await fetch(`/api/oz_geom/`)
+    //         return await response.json()
+    //     } catch (error) {
+    //         console.error('Ошибка при получении охранной зоны:', error)
+    //     }
+    // }
 }

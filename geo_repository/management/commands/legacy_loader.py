@@ -53,7 +53,8 @@ class ProtectedObjectObject:
         self.unique_id = unique_id
 
     def union_geometry(self, geom):
-        self.geom = self.geom.union(GEOSGeometry(geom))
+        new_geom = GEOSGeometry(geom)
+        self.geom = self.geom.union(new_geom)
 
     def make_unique_id(self):
         return f'{self.id}_{self.lpu}_{self.db}_{self.name}'
@@ -96,7 +97,7 @@ class LegacyDB:
 
     def get_lpu_names(self):
         lpus = self.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%_lpu'")
-        return [lp[0] for lp in lpus]
+        return [lp[0] for lp in lpus[:1]]
 
     def get_latest_zmr_table(self, schema, date=None):
         condition = f"AND table_name LIKE 'ZMR_all_{date}'" if date else "AND table_name LIKE 'ZMR_all_%'"
@@ -134,7 +135,7 @@ class LegacyDB:
     def get_protected_objects(self):
         protected_objects = []
         for schema in self.lpu_names:
-            all_protected_objects = self.execute(f'SELECT id, name, geom, lpu FROM "public"."tubes_tg" WHERE end_date IS NULL AND geom IS NOT NULL AND lpu = \'{schema}\'')
+            all_protected_objects = self.execute(f'SELECT id, name, geom, lpu FROM "public"."tubes_tg" WHERE end_date IS NULL AND geom IS NOT NULL AND lpu = \'{schema}\' ORDER BY id')
             for pr_object in all_protected_objects:
                 if pr_object[1] in [po.name for po in protected_objects]:
                     for po in protected_objects:
