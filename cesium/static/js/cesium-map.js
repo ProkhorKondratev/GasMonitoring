@@ -154,7 +154,7 @@ class ObjectManager {
             }
         }
 
-        this.viewer.zoomTo(protectionObjectsDataSource);
+        this.viewer.flyTo(protectionObjectsDataSource);
         this.viewer.dataSources.add(protectionObjectsDataSource);
     }
 

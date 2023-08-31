@@ -10,7 +10,7 @@ class ApiService {
 
     static async getProtectedObjects() {
         try {
-            const response = await fetch(`/api/protected_object_geom/`)
+            const response = await fetch(`/api/protected_objects_geom/`)
             return await response.json()
         } catch (error) {
             console.error('Ошибка при получении охраняемых объектов:', error)
